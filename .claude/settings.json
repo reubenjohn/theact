@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv tool install prek)",
+      "Bash(prek install)",
+      "Bash(prek run --all-files)",
+      "Bash(uv add:*)",
+      "Bash(set -a)",
+      "Bash(source .env)",
+      "Bash(set +a)",
+      "Bash(uv run src/getting_started.py)",
+      "Bash(source .env)"
+    ]
+  }
+}
