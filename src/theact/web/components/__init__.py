@@ -12,7 +12,7 @@ from theact.web.components.message_blocks import (
 from theact.web.components.static_turn import render_static_turn
 from theact.web.components.system_message import show_system_message
 from theact.web.components.thinking_panel import create_thinking_panel
-from theact.web.components.turn_card import create_turn_card
+from theact.web.components.turn_card import create_turn_card, create_turn_info_bar
 
 __all__ = [
     "StreamingTextBlock",
@@ -21,6 +21,7 @@ __all__ = [
     "create_player_block",
     "create_thinking_panel",
     "create_turn_card",
+    "create_turn_info_bar",
     "render_static_turn",
     "show_system_message",
 ]

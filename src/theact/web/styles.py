@@ -31,6 +31,11 @@ SYSTEM_COLOR = "#9e9e9e"
 # --- Status / info ---
 ERROR_COLOR = "#ff5252"
 
+# --- Turn info bar ---
+BEAT_COLOR = "#69f0ae"  # green, matches character palette
+CHAPTER_ADVANCE_COLOR = "#ffd740"  # gold/amber
+MOOD_COLOR = "#888888"  # subtle gray
+
 
 def get_character_color(character_name: str, character_list: list[str]) -> str:
     """Return the CSS color for a character based on roster position.
