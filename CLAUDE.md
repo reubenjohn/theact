@@ -57,20 +57,38 @@ Detailed phase-by-phase plans are in `docs/plans/`. Read them in order:
 
 ```bash
 uv sync                              # Install dependencies
-uv run pytest tests/                 # Run tests
+uv run pytest tests/                 # Run tests (unit only)
+uv run pytest tests/web/             # Run web UI browser tests (requires Chromium)
 uv run python scripts/test_llm.py    # Smoke test LLM client (needs VENICE_API_KEY)
 uv run python scripts/playtest.py --game lost-island --turns 20  # Autonomous playtest
 uv run python -m theact              # Launch CLI (Phase 04)
+uv run python -m theact.web          # Launch Web UI (port 8080)
+```
+
+## Playwright MCP (Browser Testing)
+
+A Playwright MCP server is configured for this project, giving Claude Code direct browser interaction capabilities (navigate, click, inspect DOM via accessibility snapshots).
+
+- **Config location:** `~/.claude.json` → `projects["/home/reuben/workspace/theact"].mcpServers.playwright`
+- **Mode:** headless Chromium (no GUI needed in WSL)
+- **Command:** `npx -y @playwright/mcp@latest --headless`
+- **Browser cache:** `~/.cache/ms-playwright/`
+
+To reinstall the browser binary if needed:
+```bash
+npx -y @playwright/test@latest install chromium
 ```
 
 ## Environment
 
-Requires a `.env` file:
+Requires a `.env` file (already configured in the project root):
 ```
-VENICE_API_KEY=your_key_here
+VENICE_API_KEY=<set>
 VENICE_BASE_URL=https://api.venice.ai/api/v1     # optional
 VENICE_MODEL=olafangensan-glm-4.7-flash-heretic   # optional
 ```
+
+The API key is available for live model testing, diagnostics, and playtest runs.
 
 ## Key Technical Decisions
 

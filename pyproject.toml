@@ -29,4 +29,5 @@ packages = ["src/theact"]
 dev = [
     "pytest>=9.0.2",
     "pytest-asyncio>=0.25.0",
+    "pytest-playwright>=0.7.2",
 ]

@@ -11,7 +11,10 @@
       "Bash(uv run src/getting_started.py)",
       "Bash(uv run python src/getting_started.py)",
       "Bash(source .env)",
-      "Read(//home/reuben/workspace/theact/**)"
+      "Bash(uv run:*)",
+      "Bash(npx playwright:*)",
+      "Read(//home/reuben/.cache/ms-playwright/**)",
+      "Bash(npx -y @playwright/mcp@latest --headless)"
     ]
   }
 }
