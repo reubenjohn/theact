@@ -224,9 +224,8 @@ def append_conversation(save_path: Path, entry: ConversationEntry) -> None:
 def save_memory(save_path: Path, memory: CharacterMemory) -> None:
     """Write updated character memory to memory/<name>.yaml.
 
-    The filename is derived from the character file stem. Callers must provide
-    a character_stem parameter or we derive it from the character name.
-    For simplicity, we use the character name lowered and split on first word.
+    The filename is derived by looking up the character's file stem
+    from game.yaml. Falls back to the first word of the name lowered.
     """
     # Find the right filename by scanning existing characters
     # For simplicity, accept a character_stem kwarg or derive from name
