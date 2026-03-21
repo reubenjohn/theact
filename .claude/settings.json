@@ -10,12 +10,18 @@
       "Bash(set +a)",
       "Bash(uv run src/getting_started.py)",
       "Bash(uv run python src/getting_started.py)",
+      "Bash(uv run python -m theact.web)",
       "Bash(source .env)",
       "Bash(uv run:*)",
       "Bash(npx playwright:*)",
       "Read(//home/reuben/.cache/ms-playwright/**)",
       "Bash(npx -y @playwright/mcp@latest --headless)",
-      "mcp__playwright__browser_navigate"
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_take_screenshot"
     ]
   }
 }

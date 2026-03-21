@@ -50,8 +50,9 @@ from theact.versioning.git_save import commit_turn
 logger = logging.getLogger(__name__)
 
 # Callback type for streaming output to the UI.
-# (source: "narrator"|"character", character_name: str | None, token: str)
-StreamCallback = Callable[[str, str | None, str], Awaitable[None]]
+# (source: "narrator"|"character", character_name: str | None, token: str,
+#  is_thinking: bool)
+StreamCallback = Callable[[str, str | None, str, bool], Awaitable[None]]
 
 
 async def run_turn(
@@ -91,9 +92,9 @@ async def run_turn(
     if diag:
         narrator_msgs = build_narrator_messages(game, player_input, llm_config)
 
-    async def narrator_token_cb(token: str) -> None:
+    async def narrator_token_cb(token: str, is_thinking: bool) -> None:
         if on_token:
-            await on_token("narrator", None, token)
+            await on_token("narrator", None, token, is_thinking)
 
     log_before = len(call_log.records) if call_log else 0
     narrator_output = await run_narrator(
@@ -155,9 +156,11 @@ async def run_turn(
                 llm_config,
             )
 
-        async def char_token_cb(token: str, _name: str = char.name) -> None:
+        async def char_token_cb(
+            token: str, is_thinking: bool, _name: str = char.name
+        ) -> None:
             if on_token:
-                await on_token("character", _name, token)
+                await on_token("character", _name, token, is_thinking)
 
         log_before_char = len(call_log.records) if call_log else 0
         response = await run_character(

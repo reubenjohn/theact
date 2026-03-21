@@ -1,5 +1,6 @@
 """Save management: create, load, list, and update saves."""
 
+import os
 import shutil
 from pathlib import Path
 
@@ -19,10 +20,11 @@ from theact.models.state import GameState
 from theact.models.world import World
 from theact.versioning.git_save import init_repo
 
-# Resolved relative to project root. Callers (including tests) can override
-# by passing explicit paths to create_save/load_save.
-GAMES_DIR = Path("games")
-SAVES_DIR = Path("saves")
+# When THEACT_DATA_DIR is set, games/ and saves/ live under that directory.
+# Otherwise they resolve relative to the working directory (original behavior).
+_DATA_DIR = os.environ.get("THEACT_DATA_DIR")
+GAMES_DIR = Path(_DATA_DIR) / "games" if _DATA_DIR else Path("games")
+SAVES_DIR = Path(_DATA_DIR) / "saves" if _DATA_DIR else Path("saves")
 
 
 def list_games(games_dir: Path | None = None) -> list[GameMeta]:

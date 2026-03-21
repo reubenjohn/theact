@@ -84,6 +84,10 @@ uv run pytest tests/                 # Run tests (unit only)
 uv run pytest tests/web/             # Run web UI browser tests (requires Chromium)
 uv run python -m theact              # Launch CLI
 uv run python -m theact.web          # Launch Web UI (port 8080)
+uv run scripts/dev_server.py start --port 8111  # Start dev server (background)
+uv run scripts/dev_server.py stop               # Stop dev server
+uv run scripts/dev_server.py restart --port 8111 # Restart dev server
+uv run scripts/dev_server.py status             # Check if dev server is running
 
 # LLM testing (requires VENICE_API_KEY in .env)
 uv run python scripts/test_llm.py                              # Smoke test LLM client

@@ -205,17 +205,21 @@ class GameplaySession:
             self._chat_area, self.game.state.turn + 1, chapter_title
         )
 
-        # Create thinking panel (for future use when thinking tokens
-        # are separated in the callback). Currently, thinking tokens are
-        # consumed internally by agents and not passed through on_token.
-        create_thinking_panel(turn_card)
+        thinking_block = create_thinking_panel(turn_card)
 
         # Track streaming state
         current_block: list = [None]  # mutable reference
         current_section: list = ["idle"]
 
-        async def on_token(source: str, character: str | None, token: str) -> None:
+        async def on_token(
+            source: str, character: str | None, token: str, is_thinking: bool
+        ) -> None:
             """Stream callback: route tokens to UI components."""
+            if is_thinking:
+                if self.show_thinking:
+                    thinking_block.append_text(token)
+                return
+
             if source == "narrator":
                 if current_section[0] != "narrator":
                     current_section[0] = "narrator"

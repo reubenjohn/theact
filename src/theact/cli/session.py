@@ -97,23 +97,13 @@ class GameSession:
         # Track streaming state for the on_token callback
         streaming_state = {"phase": "idle", "current_char": None}
 
-        async def on_token(source: str, character: str | None, token: str) -> None:
-            """Stream callback: route tokens to the renderer.
+        async def on_token(
+            source: str, character: str | None, token: str, is_thinking: bool
+        ) -> None:
+            """Stream callback: route tokens to the renderer."""
+            if is_thinking:
+                return
 
-            The turn engine calls this as tokens arrive from the LLM.
-            We determine whether a token is thinking or content by checking
-            for <think> tags -- but the streaming layer in turn.py already
-            separates them. The source/character tells us who is speaking.
-
-            Actually, the on_token callback from turn.py gets the raw token
-            text. The thinking/content split was done in the agents, which
-            pass tokens through. We receive the combined stream here.
-
-            For simplicity: we don't get separate thinking vs content tokens
-            from the callback -- that split happens inside the agent. The
-            callback just gets content tokens. Thinking tokens are consumed
-            internally by the agents.
-            """
             if source == "narrator":
                 if streaming_state["phase"] != "narrator":
                     streaming_state["phase"] = "narrator"

@@ -20,7 +20,7 @@ from theact.models.memory import CharacterMemory
 
 logger = logging.getLogger(__name__)
 
-StreamCallback = Callable[[str], Awaitable[None]]
+StreamCallback = Callable[[str, bool], Awaitable[None]]
 
 
 async def run_character(
@@ -61,12 +61,14 @@ async def run_character(
         llm_config=llm_config,
         agent_config=CHARACTER_CONFIG,
     ):
+        if chunk.thinking:
+            thinking_parts.append(chunk.thinking)
+            if on_token:
+                await on_token(chunk.thinking, True)
         if chunk.content:
             content_parts.append(chunk.content)
             if on_token:
-                await on_token(chunk.content)
-        if chunk.thinking:
-            thinking_parts.append(chunk.thinking)
+                await on_token(chunk.content, False)
         if chunk.finish_reason:
             finish_reason = chunk.finish_reason
 
@@ -99,12 +101,14 @@ async def run_character(
             llm_config=llm_config,
             agent_config=retry_config,
         ):
+            if chunk.thinking:
+                thinking_parts.append(chunk.thinking)
+                if on_token:
+                    await on_token(chunk.thinking, True)
             if chunk.content:
                 content_parts.append(chunk.content)
                 if on_token:
-                    await on_token(chunk.content)
-            if chunk.thinking:
-                thinking_parts.append(chunk.thinking)
+                    await on_token(chunk.content, False)
             if chunk.finish_reason:
                 finish_reason = chunk.finish_reason
 

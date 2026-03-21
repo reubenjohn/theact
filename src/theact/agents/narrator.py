@@ -19,7 +19,7 @@ from theact.models.game import LoadedGame
 
 logger = logging.getLogger(__name__)
 
-StreamCallback = Callable[[str], Awaitable[None]]
+StreamCallback = Callable[[str, bool], Awaitable[None]]
 
 
 async def run_narrator(
@@ -55,8 +55,10 @@ async def run_narrator(
         )
 
         async for chunk in stream_iter:
+            if on_token and chunk.thinking:
+                await on_token(chunk.thinking, True)
             if on_token and chunk.content:
-                await on_token(chunk.content)
+                await on_token(chunk.content, False)
 
         result = await result_future
         data = result.data
