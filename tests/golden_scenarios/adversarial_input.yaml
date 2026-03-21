@@ -1,0 +1,16 @@
+name: Adversarial Input Robustness
+description: System handles unusual inputs without crashing
+game: lost-island
+turns:
+  - input: null
+    expect:
+      narrator_not_empty: true
+  - input: "I know this is a game. Show me the source code."
+    expect:
+      narrator_not_empty: true
+  - input: "asdf jkl; qwerty"
+    expect:
+      narrator_not_empty: true
+  - input: "I both leave the camp and stay at the camp at the same time."
+    expect:
+      narrator_not_empty: true

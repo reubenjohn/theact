@@ -71,7 +71,7 @@ A Playwright MCP server is configured for this project, giving Claude Code direc
 
 - **Config location:** `~/.claude.json` → `projects["/home/reuben/workspace/theact"].mcpServers.playwright`
 - **Mode:** headless Chromium (no GUI needed in WSL)
-- **Command:** `npx -y @playwright/mcp@latest --headless`
+- **Command:** `npx -y @playwright/mcp@latest --headless --browser chromium`
 - **Browser cache:** `~/.cache/ms-playwright/`
 
 To reinstall the browser binary if needed:

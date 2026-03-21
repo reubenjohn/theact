@@ -48,6 +48,8 @@ Description</th></tr>
 <td>Undo last turn and replay same input</td></tr>
 <tr><td style="padding: 4px;">/conversation</td><td>[N]</td>
 <td>Show last N conversation entries</td></tr>
+<tr><td style="padding: 4px;">/save-as</td><td>&lt;name&gt;</td>
+<td>Fork the current save to a new name</td></tr>
 </table>
 """
 
@@ -222,3 +224,19 @@ def cmd_undo_web(
         return reloaded, f"Undone {steps} turn(s). Now at turn {new_turn}."
     except ValueError as e:
         return None, f"Cannot undo: {e}"
+
+
+def cmd_save_as_web(game: LoadedGame, args: list[str]) -> None:
+    """Fork the current save to a new name. Uses ui.notify for feedback."""
+    if not args:
+        ui.notify("Usage: /save-as <name>", type="warning")
+        return
+
+    new_name = args[0]
+    try:
+        new_path = git_save.save_as(game.save_path, new_name)
+        ui.notify(f"Save forked to '{new_name}' at {new_path}", type="positive")
+    except FileExistsError:
+        ui.notify(f"A save named '{new_name}' already exists.", type="negative")
+    except FileNotFoundError as e:
+        ui.notify(f"Cannot fork: {e}", type="negative")

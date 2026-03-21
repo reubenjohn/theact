@@ -124,13 +124,15 @@ def build_narrator_messages(
     recent = get_recent_conversation(game.conversation)
     recent_text = format_conversation(recent)
 
-    # Active characters for this chapter
+    # Active characters for this chapter (show ID + name so the model knows the mapping)
     current_chapter = game.chapters.get(game.state.current_chapter)
     active_chars = (
         current_chapter.characters if current_chapter else list(game.characters.keys())
     )
     char_names = ", ".join(
-        game.characters[cid].name for cid in active_chars if cid in game.characters
+        f"{cid} ({game.characters[cid].name})"
+        for cid in active_chars
+        if cid in game.characters
     )
 
     system = NARRATOR_SYSTEM.format(

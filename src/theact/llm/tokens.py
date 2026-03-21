@@ -37,6 +37,16 @@ def estimate_messages_tokens(messages: list[dict[str, str]]) -> int:
     return total
 
 
+def estimate_messages_content_tokens(messages: list[dict[str, str]]) -> int:
+    """Sum token estimates across all message content strings.
+
+    Unlike estimate_messages_tokens, this does NOT include per-message
+    overhead or role tokens — just the raw content. Useful for profiling
+    how much of the context budget is consumed by actual prompt text.
+    """
+    return sum(estimate_tokens(m.get("content", "")) for m in messages)
+
+
 def tokens_remaining(
     messages: list[dict[str, str]],
     context_limit: int,

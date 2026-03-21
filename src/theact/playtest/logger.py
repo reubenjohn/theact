@@ -32,6 +32,7 @@ class TurnLog:
     prompt_tokens: int = 0
     thinking_tokens: int = 0
     response_tokens: int = 0
+    agent_tokens: dict[str, dict] = field(default_factory=dict)
 
 
 class PlaytestLogger:

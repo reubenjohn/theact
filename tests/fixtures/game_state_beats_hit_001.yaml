@@ -1,0 +1,10 @@
+agent: game_state
+content: |
+  ```yaml
+  chapter_complete: false
+  reason: "Player found water but hasn't built shelter"
+  new_beats:
+    - "Find fresh water source"
+  ```
+finish_reason: stop
+parse_success: true

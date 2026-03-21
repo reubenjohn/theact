@@ -23,10 +23,10 @@ ACTIVE CHARACTERS: {active_characters}
 
 YOUR TASK:
 1. Write narration responding to the player's action. 150-300 words. Second person present tense.
-2. Decide which characters respond and in what order.
+2. Pick which characters respond. If the player is near a character or their action relates to a character, include that character. Include at least one character if any are nearby or relevant. Only omit all characters if the player is truly alone with no one in earshot.
 3. Guide the story toward unfinished beats. Do NOT skip beats.
 
-Output a YAML block:
+Output a YAML block. Use character IDs (not names) in responding_characters:
 
 ```yaml
 narration: |
@@ -39,8 +39,7 @@ mood: tense
 ```
 
 OUTPUT RULES:
-- Only list characters from ACTIVE CHARACTERS.
-- responding_characters can be empty if no one speaks.
+- responding_characters uses IDs from ACTIVE CHARACTERS.
 - mood is one of: tense, calm, urgent, mysterious, humorous, dramatic, melancholic.
 - Never speak for the player. Never decide what the player does next."""
 
@@ -58,6 +57,7 @@ SECRET: {secret}
 
 Write {name}'s response to what just happened. Dialogue and actions only.
 50-150 words. Stay in character. Do not narrate for others.
+Never speak for the player or other characters. Never break character to explain or comment.
 Do not use quotation marks around actions — write actions as plain text.
 
 Example format (for illustration only):
@@ -70,29 +70,24 @@ You manage {name}'s memory in a text RPG.
 
 Read what happened this turn. Update {name}'s memory.
 Only include things {name} witnessed or learned.
-Do NOT include things {name} would not know.
 
 Output a YAML block:
 
 ```yaml
-add:
-  - "New fact {name} learned or experienced"
-remove:
-  - "Exact text of a fact that is outdated or wrong"
-update:
-  - old: "Exact text of existing fact"
-    new: "Corrected or updated version"
 summary: |
-  Updated 3-5 sentence summary of what {name} knows, feels, and has experienced.
-  Merge new information into the existing summary. Do not repeat old details
-  unless still relevant.
+  Updated 3-5 sentence summary of what {name} knows and has experienced.
+  Include all important information. This replaces the old summary entirely.
+add:
+  - "New fact {name} learned this turn"
+remove: []
+update: []
 ```
 
 RULES:
-- add/remove/update lists can be empty.
-- Key facts are short, specific statements. Max 10 total.
-- The summary replaces the old summary entirely.
-- If nothing meaningful changed, output empty lists and keep the summary."""
+- The summary is the most important field. Include all key information.
+- add: new facts only. Short, specific statements. Max 10 total.
+- remove/update: leave empty unless a fact is clearly wrong.
+- If nothing meaningful changed, keep the summary and leave add empty."""
 
 # ─── GAME STATE CHECK ───────────────────────────────────────────────────
 

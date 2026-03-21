@@ -70,13 +70,13 @@ class TestAgentDefaults:
         assert CHARACTER_CONFIG.structured is False
 
     def test_memory_update_config(self):
-        assert MEMORY_UPDATE_CONFIG.temperature == 0.3
+        assert MEMORY_UPDATE_CONFIG.temperature == 0.2
         assert MEMORY_UPDATE_CONFIG.max_tokens == 1500
         assert MEMORY_UPDATE_CONFIG.structured is True
 
     def test_game_state_config(self):
         assert GAME_STATE_CONFIG.temperature == 0.2
-        assert GAME_STATE_CONFIG.max_tokens == 1000
+        assert GAME_STATE_CONFIG.max_tokens == 800
         assert GAME_STATE_CONFIG.structured is True
 
     def test_summarizer_config(self):

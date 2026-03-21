@@ -22,6 +22,7 @@ COMMANDS = {
     "think": {"args": "[on|off]", "desc": "Toggle thinking display"},
     "retry": {"args": "", "desc": "Undo last turn and replay same input"},
     "conversation": {"args": "[N]", "desc": "Show last N conversation entries"},
+    "save-as": {"args": "<name>", "desc": "Fork the current save to a new name"},
 }
 
 
@@ -228,3 +229,28 @@ def cmd_conversation(console: Console, game: LoadedGame, args: list[str]) -> Non
             text = entry.content[:200] + ("..." if len(entry.content) > 200 else "")
             console.print(f"  {name}: {text}", style=COMMAND_OUTPUT_STYLE)
     console.print()
+
+
+def cmd_save_as(console: Console, game: LoadedGame, args: list[str]) -> None:
+    """Fork the current save to a new name.
+
+    Creates a full copy (including git history) under a new save ID.
+    """
+    if not args:
+        console.print("Usage: /save-as <name>", style=ERROR_STYLE)
+        return
+
+    new_name = args[0]
+    try:
+        new_path = git_save.save_as(game.save_path, new_name)
+        console.print(
+            f"Save forked to '{new_name}' at {new_path}",
+            style=STATUS_STYLE,
+        )
+    except FileExistsError:
+        console.print(
+            f"A save named '{new_name}' already exists.",
+            style=ERROR_STYLE,
+        )
+    except FileNotFoundError as e:
+        console.print(f"Cannot fork: {e}", style=ERROR_STYLE)

@@ -1,0 +1,15 @@
+name: Crash Opening Sequence
+description: First 3 turns produce coherent crash scene
+game: lost-island
+turns:
+  - input: null
+    expect:
+      narrator_not_empty: true
+  - input: "I try to free myself and look around."
+    expect:
+      narrator_not_empty: true
+      narrator_word_count_min: 50
+  - input: "I look for other survivors."
+    expect:
+      narrator_not_empty: true
+      characters_responded_min: 1

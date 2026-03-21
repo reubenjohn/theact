@@ -22,6 +22,7 @@ from theact.web.commands import (
     cmd_help_web,
     cmd_history_web,
     cmd_memory_web,
+    cmd_save_as_web,
     cmd_save_web,
     cmd_status_web,
     cmd_undo_web,
@@ -321,6 +322,8 @@ class GameplaySession:
             await self._cmd_retry()
         elif cmd == "conversation":
             cmd_conversation_web(self._chat_area, self.game, args)
+        elif cmd == "save-as":
+            cmd_save_as_web(self.game, args)
         else:
             ui.notify(
                 f"Unknown command: /{cmd}. Type /help for available commands.",

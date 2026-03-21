@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+from dataclasses import dataclass
 
 from theact.llm.config import AgentLLMConfig, LLMConfig
 from theact.llm.inference import complete
@@ -37,11 +38,55 @@ EDGE_CASE_PROMPTS = [
     "Try to use or interact with an object that hasn't been mentioned.",
 ]
 
+# Pre-defined strings for direct injection (bypass LLM entirely)
+DIRECT_INJECTION_SHORT = [
+    "ok",
+    "sure",
+    "yes",
+    "no",
+    ".",
+    "I wait.",
+]
+
+DIRECT_INJECTION_NONSENSE = [
+    "asdf jkl;",
+    "THE QUICK BROWN FOX THE QUICK BROWN FOX",
+    "sudo rm -rf /",
+]
+
+DIRECT_INJECTION_FOURTH_WALL = [
+    "I know this is a game",
+    "What's my hit points?",
+    "Can I see the map?",
+]
+
+DIRECT_INJECTION_CONTRADICTORY = [
+    "I both leave and stay at the same time",
+]
+
+# Combined pool for direct injection
+DIRECT_INJECTION_ALL = (
+    DIRECT_INJECTION_SHORT
+    + DIRECT_INJECTION_NONSENSE
+    + DIRECT_INJECTION_FOURTH_WALL
+    + DIRECT_INJECTION_CONTRADICTORY
+)
+
 PLAYER_AGENT_CONFIG = AgentLLMConfig(
     temperature=0.9,
     max_tokens=150,
     structured=False,
 )
+
+
+@dataclass
+class PlayerDecision:
+    """Result of a player agent decision, with metadata about edge case type."""
+
+    action: str
+    edge_case_type: str = "normal"
+    # Possible types: "normal", "llm_edge_case", "direct_injection",
+    # "nonsense_injection", "repeat_injection"
 
 
 class PlayerAgent:
@@ -51,9 +96,16 @@ class PlayerAgent:
         self,
         llm_config: LLMConfig,
         edge_case_frequency: float = 0.15,
+        direct_edge_case_frequency: float = 0.05,
+        nonsense_frequency: float = 0.03,
+        repeat_frequency: float = 0.03,
     ) -> None:
         self.llm_config = llm_config
         self.edge_case_frequency = edge_case_frequency
+        self.direct_edge_case_frequency = direct_edge_case_frequency
+        self.nonsense_frequency = nonsense_frequency
+        self.repeat_frequency = repeat_frequency
+        self._last_action: str | None = None
 
     async def decide(
         self,
@@ -61,9 +113,52 @@ class PlayerAgent:
         chapter: Chapter,
         turn_number: int,
     ) -> str:
-        """Generate the next player action based on recent conversation."""
+        """Generate the next player action based on recent conversation.
+
+        Returns the action string. Use decide_with_metadata() to also
+        get the edge case type label.
+        """
+        decision = await self.decide_with_metadata(
+            conversation_tail, chapter, turn_number
+        )
+        return decision.action
+
+    async def decide_with_metadata(
+        self,
+        conversation_tail: list[ConversationEntry],
+        chapter: Chapter,
+        turn_number: int,
+    ) -> PlayerDecision:
+        """Generate the next player action with edge case metadata.
+
+        Checks injection types in order:
+        1. Direct string injection (bypass LLM)
+        2. Nonsense injection (subset of direct)
+        3. Repeat injection (repeat previous action)
+        4. Normal LLM generation (with possible edge case prompt)
+        """
+        # 1. Direct string injection — bypass LLM entirely
+        if random.random() < self.direct_edge_case_frequency:
+            action = random.choice(DIRECT_INJECTION_ALL)
+            self._last_action = action
+            return PlayerDecision(action=action, edge_case_type="direct_injection")
+
+        # 2. Nonsense injection
+        if random.random() < self.nonsense_frequency:
+            action = random.choice(DIRECT_INJECTION_NONSENSE)
+            self._last_action = action
+            return PlayerDecision(action=action, edge_case_type="nonsense_injection")
+
+        # 3. Repeat injection — return the same action as previous turn
+        if self._last_action and random.random() < self.repeat_frequency:
+            return PlayerDecision(
+                action=self._last_action, edge_case_type="repeat_injection"
+            )
+
+        # 4. Normal LLM generation (with possible edge case prompt)
         system = PLAYER_SYSTEM_PROMPT
         is_edge_case = random.random() < self.edge_case_frequency
+        edge_case_type = "llm_edge_case" if is_edge_case else "normal"
 
         if is_edge_case:
             system += "\n\n" + random.choice(EDGE_CASE_PROMPTS)
@@ -105,4 +200,6 @@ class PlayerAgent:
             agent_config=PLAYER_AGENT_CONFIG,
         )
 
-        return result.content.strip()
+        action = result.content.strip()
+        self._last_action = action
+        return PlayerDecision(action=action, edge_case_type=edge_case_type)

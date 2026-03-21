@@ -1,0 +1,10 @@
+agent: game_state
+content: |
+  ```yaml
+  chapter_complete: true
+  reason: "All beats have been hit and camp is established"
+  new_beats:
+    - "Establish base camp"
+  ```
+finish_reason: stop
+parse_success: true

@@ -1,0 +1,13 @@
+name: Short Input Handling
+description: System handles very short player inputs gracefully
+game: lost-island
+turns:
+  - input: null
+    expect:
+      narrator_not_empty: true
+  - input: "ok"
+    expect:
+      narrator_not_empty: true
+  - input: "yes"
+    expect:
+      narrator_not_empty: true

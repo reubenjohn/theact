@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import logging
 import time
+from pathlib import Path
 
 from theact.engine.turn import run_turn
 from theact.engine.types import TurnResult
 from theact.io.save_manager import create_save, load_save
+from theact.llm.call_log import LLMCallLog
 from theact.playtest.config import PlaytestConfig
 from theact.playtest.logger import PlaytestLogger
 from theact.playtest.player_agent import PlayerAgent
@@ -16,6 +18,7 @@ from theact.playtest.report import (
     generate_report,
     write_report,
 )
+from theact.playtest.scoring import score_turn
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +29,15 @@ class PlaytestRunner:
     def __init__(self, config: PlaytestConfig) -> None:
         self.config = config
         self.logger = PlaytestLogger()
+        self.call_log = LLMCallLog()
         self.player_agent = PlayerAgent(
             config.llm_config,
             edge_case_frequency=config.edge_case_frequency,
+            direct_edge_case_frequency=config.direct_edge_case_frequency,
+            nonsense_frequency=config.nonsense_frequency,
+            repeat_frequency=config.repeat_frequency,
         )
+        self._quality_scores: list[dict] = []
 
     async def run(self) -> PlaytestReport:
         """Execute a full playtest. Returns a PlaytestReport."""
@@ -50,7 +58,10 @@ class PlaytestRunner:
         try:
             turn_start = time.monotonic()
             opening_result = await run_turn(
-                game, player_input="", llm_config=self.config.llm_config
+                game,
+                player_input="",
+                llm_config=self.config.llm_config,
+                call_log=self.call_log,
             )
             self.logger.log_turn_result(
                 0, opening_result, time.monotonic() - turn_start
@@ -88,7 +99,10 @@ class PlaytestRunner:
 
                 # Run the turn engine
                 result = await run_turn(
-                    game, player_input, llm_config=self.config.llm_config
+                    game,
+                    player_input,
+                    llm_config=self.config.llm_config,
+                    call_log=self.call_log,
                 )
 
                 elapsed = time.monotonic() - turn_start
@@ -100,6 +114,9 @@ class PlaytestRunner:
                 self.logger.log_turn_result(turn_num, result, elapsed)
                 for issue in detected_issues:
                     self.logger.log_issue(turn_num, issue)
+
+                # Compute quality score for this turn
+                self._compute_quality_score(turn_num, result, game)
 
                 # Check chapter completion
                 if result.chapter_advanced:
@@ -137,10 +154,74 @@ class PlaytestRunner:
             game_title=self.config.game_id,
             total_duration=total_duration,
             memory_final=memory_final,
+            call_log=self.call_log,
+            quality_scores=self._quality_scores,
         )
 
         write_report(report, self.logger, self.config)
+
+        # Dump call log to YAML
+        out_path = Path(self.config.output_dir) / self.config.timestamp
+        out_path.mkdir(parents=True, exist_ok=True)
+        self.call_log.dump_yaml(out_path / "llm_calls.yaml")
+
         return report
+
+    def _compute_quality_score(
+        self,
+        turn_num: int,
+        result: TurnResult,
+        game: object,
+    ) -> None:
+        """Compute and store quality score for a turn."""
+        from theact.models.game import LoadedGame
+
+        if not isinstance(game, LoadedGame):
+            return
+
+        narration = result.narrator.narration if result.narrator else ""
+
+        # Build parallel lists of character response texts and Character objects
+        char_responses: list[str] = []
+        char_objects: list[object] = []
+        for cr in result.characters:
+            char_responses.append(cr.response)
+            # Find matching Character object by name
+            for char in game.characters.values():
+                if char.name == cr.character:
+                    char_objects.append(char)
+                    break
+
+        # Collect memory update facts
+        memory_facts: list[str] = []
+        for diff in result.memory_diffs:
+            memory_facts.extend(diff.new_facts)
+
+        # Get issues for this turn from the logger
+        yaml_issues: list[str] = []
+        for t in self.logger.turns:
+            if t.turn == turn_num:
+                yaml_issues = t.issues
+                break
+
+        score = score_turn(
+            narration=narration,
+            character_responses=char_responses,
+            characters=char_objects,  # type: ignore[arg-type]
+            memory_updates=memory_facts,
+            yaml_issues=yaml_issues,
+        )
+
+        self._quality_scores.append(
+            {
+                "turn": turn_num,
+                "narration_length_ok": score.narration_length_ok,
+                "yaml_first_attempt": score.yaml_first_attempt,
+                "character_personality": score.character_personality,
+                "memory_relevance": score.memory_relevance,
+                "composite": score.composite,
+            }
+        )
 
     def _detect_issues(self, turn: int, result: TurnResult) -> list[str]:
         """Detect common problems. Returns a list of issue strings.

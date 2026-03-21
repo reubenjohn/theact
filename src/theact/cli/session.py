@@ -14,6 +14,7 @@ from theact.cli.commands import (
     cmd_history,
     cmd_memory,
     cmd_save,
+    cmd_save_as,
     cmd_status,
     cmd_think,
     cmd_undo,
@@ -192,6 +193,8 @@ class GameSession:
             await self._retry()
         elif cmd == "conversation":
             cmd_conversation(self.console, self.game, args)
+        elif cmd == "save-as":
+            cmd_save_as(self.console, self.game, args)
         else:
             self.console.print(
                 f"Unknown command: /{cmd}. Type /help for available commands.",

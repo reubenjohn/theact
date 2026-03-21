@@ -17,7 +17,10 @@ class PlaytestConfig:
     player_name: str = "Alex"  # default player name
     opening_action: str = "I try to free my arm and look around."
     stop_on_error: bool = False  # keep going through errors
-    edge_case_frequency: float = 0.15  # 15% chance of unusual action
+    edge_case_frequency: float = 0.15  # 15% edge cases via player agent
+    direct_edge_case_frequency: float = 0.05  # 5% direct string injection
+    nonsense_frequency: float = 0.03  # 3% nonsensical
+    repeat_frequency: float = 0.03  # 3% repeat previous
     timestamp: str = ""  # auto-filled if empty
     llm_config: LLMConfig = field(default_factory=LLMConfig)
     output_dir: str = "playtests"  # base output directory

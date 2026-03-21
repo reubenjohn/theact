@@ -1,0 +1,14 @@
+agent: memory
+content: |
+  ```yaml
+  summary: |
+    Maya knows about the crash and has met the player.
+    She is wary but willing to cooperate.
+  add:
+    - "Player seems trustworthy"
+    - "Found fresh water source"
+  remove: []
+  update: []
+  ```
+finish_reason: stop
+parse_success: true

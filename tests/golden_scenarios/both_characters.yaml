@@ -1,0 +1,14 @@
+name: Both Characters Respond
+description: Scenario designed to elicit responses from multiple characters
+game: lost-island
+turns:
+  - input: null
+    expect:
+      narrator_not_empty: true
+  - input: "I call out loudly for anyone who can hear me."
+    expect:
+      narrator_not_empty: true
+  - input: "I gather everyone together and suggest we work as a team."
+    expect:
+      narrator_not_empty: true
+      characters_responded_min: 1

@@ -1,0 +1,14 @@
+name: Maya Dialogue
+description: Direct interaction with Maya
+game: lost-island
+turns:
+  - input: null
+    expect:
+      narrator_not_empty: true
+  - input: "I look for survivors nearby."
+    expect:
+      narrator_not_empty: true
+  - input: "I ask her what she knows about this place."
+    expect:
+      narrator_not_empty: true
+      characters_responded_min: 1

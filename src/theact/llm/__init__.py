@@ -11,11 +11,13 @@ from theact.llm.config import (
     LLMConfig,
     load_llm_config,
 )
+from theact.llm.call_log import LLMCallLog, LLMCallRecord
 from theact.llm.errors import (
     LLMConnectionError,
     LLMError,
     LLMRateLimitError,
     LLMResponseError,
+    ParseFailureType,
 )
 from theact.llm.inference import (
     Message,
@@ -24,14 +26,26 @@ from theact.llm.inference import (
     stream,
     stream_structured,
 )
-from theact.llm.parsing import YAMLParseError, parse_yaml_response, validate_yaml_fields
+from theact.llm.parsing import (
+    YAMLParseError,
+    classify_parse_failure,
+    parse_yaml_response,
+    validate_yaml_fields,
+)
 from theact.llm.streaming import (
     LLMResult,
     StreamChunk,
     StructuredResult,
     collect_stream,
 )
+from theact.llm.profiler import (
+    AgentProfile,
+    format_profile,
+    format_turn_profile,
+    profile_messages,
+)
 from theact.llm.tokens import (
+    estimate_messages_content_tokens,
     estimate_messages_tokens,
     estimate_tokens,
     tokens_remaining,
@@ -64,12 +78,23 @@ __all__ = [
     # Parsing
     "parse_yaml_response",
     "validate_yaml_fields",
+    "classify_parse_failure",
     "YAMLParseError",
     # Tokens
     "estimate_tokens",
     "estimate_messages_tokens",
+    "estimate_messages_content_tokens",
     "tokens_remaining",
+    # Profiler
+    "AgentProfile",
+    "profile_messages",
+    "format_profile",
+    "format_turn_profile",
+    # Call log
+    "LLMCallLog",
+    "LLMCallRecord",
     # Errors
+    "ParseFailureType",
     "LLMError",
     "LLMConnectionError",
     "LLMRateLimitError",

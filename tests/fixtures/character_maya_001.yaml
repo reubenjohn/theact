@@ -1,0 +1,7 @@
+agent: character
+content: |
+  *Maya pushes debris aside and stands up, brushing dust from her clothes.*
+  "Hey — are you okay? We need to move. This wreckage could collapse."
+  *She looks around quickly, assessing the situation.*
+finish_reason: stop
+parse_success: true

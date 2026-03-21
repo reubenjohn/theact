@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
 
 from theact.playtest.config import PlaytestConfig
 from theact.playtest.logger import PlaytestLogger
+
+if TYPE_CHECKING:
+    from theact.llm.call_log import LLMCallLog
 
 
 @dataclass
@@ -36,6 +40,16 @@ class PlaytestReport:
     slowest_turn_seconds: float = 0.0
     fastest_turn_seconds: float = 0.0
 
+    # Quality scoring
+    character_response_rate: float = 0.0  # % of turns with >= 1 character
+    yaml_parse_success_rate: float = 0.0  # % of turns without parse failure
+    quality_scores: list[dict] = field(default_factory=list)  # per-turn scores
+
+    # LLM call log stats (populated when call_log is provided)
+    call_log_summary: dict = field(default_factory=dict)
+    call_log_totals: dict = field(default_factory=dict)
+    parse_failure_breakdown: dict = field(default_factory=dict)
+
 
 def generate_report(
     logger: PlaytestLogger,
@@ -43,8 +57,17 @@ def generate_report(
     game_title: str,
     total_duration: float,
     memory_final: dict[str, str] | None = None,
+    call_log: LLMCallLog | None = None,
+    quality_scores: list[dict] | None = None,
 ) -> PlaytestReport:
-    """Compile logger data into a PlaytestReport."""
+    """Compile logger data into a PlaytestReport.
+
+    Args:
+        call_log: Optional LLMCallLog to include call statistics in the report.
+        quality_scores: Optional per-turn quality score dicts from scoring module.
+    """
+    from theact.llm.call_log import LLMCallLog as _LLMCallLog  # runtime import
+
     turns_played = len(logger.turns)
     issues = logger.all_issues()
 
@@ -69,6 +92,36 @@ def generate_report(
     slowest = max(elapsed_values) if elapsed_values else 0.0
     fastest = min(elapsed_values) if elapsed_values else 0.0
 
+    # Character response rate: % of turns with >= 1 character responding
+    turns_with_chars = sum(1 for t in logger.turns if t.characters_responded)
+    character_response_rate = turns_with_chars / turns_played if turns_played else 0.0
+
+    # YAML parse success rate: % of turns without parse-related issues
+    turns_with_parse_issues = sum(
+        1
+        for t in logger.turns
+        if any("yaml" in i.lower() or "parse" in i.lower() for i in t.issues)
+    )
+    yaml_parse_success_rate = (
+        (turns_played - turns_with_parse_issues) / turns_played if turns_played else 0.0
+    )
+
+    # Compute call log stats if available
+    call_log_summary: dict = {}
+    call_log_totals: dict = {}
+    parse_failure_breakdown: dict = {}
+
+    if call_log and isinstance(call_log, _LLMCallLog) and call_log.records:
+        call_log_summary = call_log.agent_summary()
+        call_log_totals = call_log.summary()
+
+        # Build parse failure breakdown
+        failures: dict[str, int] = {}
+        for r in call_log.records:
+            if r.parse_result != "success":
+                failures[r.parse_result] = failures.get(r.parse_result, 0) + 1
+        parse_failure_breakdown = failures
+
     return PlaytestReport(
         game_id=config.game_id,
         game_title=game_title,
@@ -87,6 +140,12 @@ def generate_report(
         avg_turn_seconds=round(avg_turn, 2),
         slowest_turn_seconds=round(slowest, 2),
         fastest_turn_seconds=round(fastest, 2),
+        character_response_rate=round(character_response_rate, 3),
+        yaml_parse_success_rate=round(yaml_parse_success_rate, 3),
+        quality_scores=quality_scores or [],
+        call_log_summary=call_log_summary,
+        call_log_totals=call_log_totals,
+        parse_failure_breakdown=parse_failure_breakdown,
     )
 
 
@@ -137,6 +196,42 @@ def generate_report_markdown(report: PlaytestReport) -> str:
     lines.append(f"- Fastest turn: {report.fastest_turn_seconds}s")
     lines.append("")
 
+    # Quality Scores
+    if report.quality_scores:
+        lines.append("## Quality Scores")
+        lines.append("")
+        lines.append(
+            "| Turn | Narration Length | YAML First Try "
+            "| Character Personality | Memory Relevance | Composite |"
+        )
+        lines.append(
+            "|------|-----------------|----------------"
+            "|----------------------|------------------|-----------|"
+        )
+        for qs in report.quality_scores:
+            ok = "ok" if qs.get("narration_length_ok") else "bad"
+            yaml_ok = "yes" if qs.get("yaml_first_attempt") else "no"
+            personality = f"{qs.get('character_personality', 0.0):.2f}"
+            mem = "yes" if qs.get("memory_relevance") else "no"
+            comp = f"{qs.get('composite', 0.0):.2f}"
+            lines.append(
+                f"| {qs.get('turn', '?')} | {ok} | {yaml_ok} "
+                f"| {personality} | {mem} | {comp} |"
+            )
+        lines.append("")
+
+        # Average composite
+        composites = [qs.get("composite", 0.0) for qs in report.quality_scores]
+        if composites:
+            avg_composite = sum(composites) / len(composites)
+            lines.append(f"**Average composite score:** {avg_composite:.2f}")
+            lines.append("")
+
+        # Character response rate and YAML parse success rate
+        lines.append(f"- Character response rate: {report.character_response_rate:.1%}")
+        lines.append(f"- YAML parse success rate: {report.yaml_parse_success_rate:.1%}")
+        lines.append("")
+
     # Per-Turn Detail
     lines.append("## Per-Turn Detail")
     lines.append("")
@@ -159,6 +254,44 @@ def generate_report_markdown(report: PlaytestReport) -> str:
         for turn, event, detail in report.events:
             lines.append(f"- Turn {turn}: {event} {detail}")
         lines.append("")
+
+    # LLM Call Summary
+    if report.call_log_totals:
+        lines.append("## LLM Call Summary")
+        lines.append("")
+        totals = report.call_log_totals
+        lines.append(f"- Total calls: {totals.get('total_calls', 0)}")
+        lines.append(f"- Mean latency: {totals.get('mean_latency_ms', 0)}ms")
+        lines.append(f"- Parse success rate: {totals.get('parse_success_rate', 0):.1%}")
+        lines.append(f"- Total prompt tokens: {totals.get('total_prompt_tokens', 0)}")
+        lines.append(
+            f"- Total thinking tokens: {totals.get('total_thinking_tokens', 0)}"
+        )
+        lines.append(f"- Total content tokens: {totals.get('total_content_tokens', 0)}")
+        lines.append(f"- Length finishes: {totals.get('length_finishes', 0)}")
+        lines.append(f"- Total retries: {totals.get('total_retries', 0)}")
+        lines.append("")
+
+        # Per-agent breakdown table
+        if report.call_log_summary:
+            lines.append("| Agent | Calls | Mean Latency | Parse Rate | Retries |")
+            lines.append("|-------|-------|-------------|------------|---------|")
+            for agent, stats in report.call_log_summary.items():
+                lines.append(
+                    f"| {agent} | {stats['total_calls']} | "
+                    f"{stats['mean_latency_ms']}ms | "
+                    f"{stats['parse_success_rate']:.1%} | "
+                    f"{stats['total_retries']} |"
+                )
+            lines.append("")
+
+        # Parse failure breakdown
+        if report.parse_failure_breakdown:
+            lines.append("### Parse Failures")
+            lines.append("")
+            for failure_type, count in report.parse_failure_breakdown.items():
+                lines.append(f"- {failure_type}: {count}")
+            lines.append("")
 
     # Memory State
     if report.memory_final:

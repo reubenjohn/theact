@@ -1,0 +1,9 @@
+agent: game_state
+content: |
+  ```yaml
+  chapter_complete: false
+  reason: "The player has just woken up and hasn't taken any significant actions yet."
+  new_beats: []
+  ```
+finish_reason: stop
+parse_success: true

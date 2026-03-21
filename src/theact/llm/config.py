@@ -47,7 +47,7 @@ CHARACTER_CONFIG = AgentLLMConfig(
 )
 
 MEMORY_UPDATE_CONFIG = AgentLLMConfig(
-    temperature=0.3,
+    temperature=0.2,
     max_tokens=1500,
     structured=True,
     max_retries=2,
@@ -55,7 +55,7 @@ MEMORY_UPDATE_CONFIG = AgentLLMConfig(
 
 GAME_STATE_CONFIG = AgentLLMConfig(
     temperature=0.2,
-    max_tokens=1000,
+    max_tokens=800,
     structured=True,
     max_retries=2,
 )

@@ -16,8 +16,14 @@ from theact.engine.types import (
 from theact.playtest.config import PlaytestConfig
 from theact.playtest.logger import PlaytestLogger, TurnLog
 from theact.playtest.player_agent import (
+    DIRECT_INJECTION_ALL,
+    DIRECT_INJECTION_CONTRADICTORY,
+    DIRECT_INJECTION_FOURTH_WALL,
+    DIRECT_INJECTION_NONSENSE,
+    DIRECT_INJECTION_SHORT,
     EDGE_CASE_PROMPTS,
     PLAYER_SYSTEM_PROMPT,
+    PlayerDecision,
 )
 from theact.playtest.report import (
     PlaytestReport,
@@ -66,6 +72,9 @@ class TestPlaytestConfig:
         assert config.max_turns == 20
         assert config.player_name == "Alex"
         assert config.edge_case_frequency == 0.15
+        assert config.direct_edge_case_frequency == 0.05
+        assert config.nonsense_frequency == 0.03
+        assert config.repeat_frequency == 0.03
         assert config.timestamp != ""  # auto-filled
 
     def test_custom_timestamp_preserved(self):
@@ -757,3 +766,314 @@ class TestLostIslandGameFiles:
         ]:
             chap_size = (game_dir / "chapters" / name).stat().st_size
             assert chap_size < 800, f"{name} is {chap_size} bytes (budget: 800)"
+
+
+# -- Enhanced Edge Case Injection -------------------------------------------
+
+
+class TestPlayerDecision:
+    def test_default_type(self):
+        d = PlayerDecision(action="I look around.")
+        assert d.action == "I look around."
+        assert d.edge_case_type == "normal"
+
+    def test_custom_type(self):
+        d = PlayerDecision(action="ok", edge_case_type="direct_injection")
+        assert d.edge_case_type == "direct_injection"
+
+
+class TestDirectInjectionConstants:
+    def test_short_inputs(self):
+        assert "ok" in DIRECT_INJECTION_SHORT
+        assert "sure" in DIRECT_INJECTION_SHORT
+        assert "yes" in DIRECT_INJECTION_SHORT
+        assert "no" in DIRECT_INJECTION_SHORT
+        assert "." in DIRECT_INJECTION_SHORT
+        assert "I wait." in DIRECT_INJECTION_SHORT
+
+    def test_nonsense_inputs(self):
+        assert "asdf jkl;" in DIRECT_INJECTION_NONSENSE
+        assert "sudo rm -rf /" in DIRECT_INJECTION_NONSENSE
+        assert len(DIRECT_INJECTION_NONSENSE) >= 3
+
+    def test_fourth_wall_inputs(self):
+        assert "I know this is a game" in DIRECT_INJECTION_FOURTH_WALL
+        assert "What's my hit points?" in DIRECT_INJECTION_FOURTH_WALL
+        assert "Can I see the map?" in DIRECT_INJECTION_FOURTH_WALL
+
+    def test_contradictory_inputs(self):
+        assert (
+            "I both leave and stay at the same time" in DIRECT_INJECTION_CONTRADICTORY
+        )
+
+    def test_all_pool_is_union(self):
+        expected = (
+            DIRECT_INJECTION_SHORT
+            + DIRECT_INJECTION_NONSENSE
+            + DIRECT_INJECTION_FOURTH_WALL
+            + DIRECT_INJECTION_CONTRADICTORY
+        )
+        assert DIRECT_INJECTION_ALL == expected
+
+    def test_all_pool_nonempty(self):
+        assert len(DIRECT_INJECTION_ALL) > 0
+        for item in DIRECT_INJECTION_ALL:
+            assert isinstance(item, str)
+            assert len(item) > 0
+
+
+class TestPlaytestConfigEdgeCaseFields:
+    def test_custom_frequencies(self):
+        config = PlaytestConfig(
+            game_id="test",
+            direct_edge_case_frequency=0.10,
+            nonsense_frequency=0.05,
+            repeat_frequency=0.08,
+        )
+        assert config.direct_edge_case_frequency == 0.10
+        assert config.nonsense_frequency == 0.05
+        assert config.repeat_frequency == 0.08
+
+
+# -- Golden Scenario Framework (offline tests) ------------------------------
+
+
+class TestGoldenScenarioLoadScenario:
+    def test_loads_yaml(self, tmp_path: Path):
+        from scripts.run_golden import load_scenario
+
+        scenario_data = {
+            "name": "Test Scenario",
+            "description": "A test",
+            "game": "test-game",
+            "turns": [
+                {"input": None, "expect": {"narrator_not_empty": True}},
+                {"input": "hello", "expect": {"narrator_not_empty": True}},
+            ],
+        }
+        path = tmp_path / "test.yaml"
+        with open(path, "w") as f:
+            yaml.dump(scenario_data, f)
+
+        loaded = load_scenario(path)
+        assert loaded["name"] == "Test Scenario"
+        assert loaded["game"] == "test-game"
+        assert len(loaded["turns"]) == 2
+
+
+class TestGoldenScenarioEvaluateAssertions:
+    def test_narrator_not_empty_pass(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(narration="Some text here.")
+        failures = evaluate_assertions(result, {"narrator_not_empty": True})
+        assert failures == []
+
+    def test_narrator_not_empty_fail(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(narration="")
+        failures = evaluate_assertions(result, {"narrator_not_empty": True})
+        assert len(failures) == 1
+        assert "narrator_not_empty" in failures[0]
+
+    def test_narrator_word_count_min_pass(self):
+        from scripts.run_golden import evaluate_assertions
+
+        text = " ".join(["word"] * 60)
+        result = _make_turn_result(narration=text)
+        failures = evaluate_assertions(result, {"narrator_word_count_min": 50})
+        assert failures == []
+
+    def test_narrator_word_count_min_fail(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(narration="Just a few words.")
+        failures = evaluate_assertions(result, {"narrator_word_count_min": 50})
+        assert len(failures) == 1
+        assert "narrator_word_count_min" in failures[0]
+
+    def test_narrator_word_count_max_pass(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(narration="Short text here.")
+        failures = evaluate_assertions(result, {"narrator_word_count_max": 100})
+        assert failures == []
+
+    def test_narrator_word_count_max_fail(self):
+        from scripts.run_golden import evaluate_assertions
+
+        text = " ".join(["word"] * 150)
+        result = _make_turn_result(narration=text)
+        failures = evaluate_assertions(result, {"narrator_word_count_max": 100})
+        assert len(failures) == 1
+        assert "narrator_word_count_max" in failures[0]
+
+    def test_characters_responded_min_pass(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(
+            narration="Some text.",
+            characters=[CharacterResponse(character="Maya Chen", response="Hi.")],
+        )
+        failures = evaluate_assertions(result, {"characters_responded_min": 1})
+        assert failures == []
+
+    def test_characters_responded_min_fail(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(narration="Some text.")
+        failures = evaluate_assertions(result, {"characters_responded_min": 1})
+        assert len(failures) == 1
+        assert "characters_responded_min" in failures[0]
+
+    def test_characters_responded_max_pass(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(
+            narration="Some text.",
+            characters=[CharacterResponse(character="Maya Chen", response="Hi.")],
+        )
+        failures = evaluate_assertions(result, {"characters_responded_max": 2})
+        assert failures == []
+
+    def test_characters_responded_max_fail(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(
+            narration="Some text.",
+            characters=[
+                CharacterResponse(character="Maya Chen", response="Hi."),
+                CharacterResponse(character="Joaquin", response="Hello."),
+                CharacterResponse(character="Extra", response="Hey."),
+            ],
+        )
+        failures = evaluate_assertions(result, {"characters_responded_max": 2})
+        assert len(failures) == 1
+        assert "characters_responded_max" in failures[0]
+
+    def test_characters_responded_includes_pass(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(narration="Some text.")
+        # Override responding_characters on the narrator
+        result.narrator.responding_characters = ["maya", "joaquin"]
+        failures = evaluate_assertions(
+            result, {"characters_responded_includes": ["maya"]}
+        )
+        assert failures == []
+
+    def test_characters_responded_includes_fail(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(narration="Some text.")
+        result.narrator.responding_characters = ["maya"]
+        failures = evaluate_assertions(
+            result, {"characters_responded_includes": ["joaquin"]}
+        )
+        assert len(failures) == 1
+        assert "characters_responded_includes" in failures[0]
+
+    def test_beats_hit_any_pass(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(
+            narration="Some text.", beats_hit=["Player wakes up"]
+        )
+        failures = evaluate_assertions(result, {"beats_hit_any": True})
+        assert failures == []
+
+    def test_beats_hit_any_fail(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(narration="Some text.")
+        failures = evaluate_assertions(result, {"beats_hit_any": True})
+        assert len(failures) == 1
+        assert "beats_hit_any" in failures[0]
+
+    def test_beats_hit_count_min_pass(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(
+            narration="Some text.",
+            beats_hit=["Beat 1", "Beat 2"],
+        )
+        failures = evaluate_assertions(result, {"beats_hit_count_min": 2})
+        assert failures == []
+
+    def test_beats_hit_count_min_fail(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(narration="Some text.", beats_hit=["Beat 1"])
+        failures = evaluate_assertions(result, {"beats_hit_count_min": 2})
+        assert len(failures) == 1
+        assert "beats_hit_count_min" in failures[0]
+
+    def test_no_assertions_no_failures(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(narration="Some text.")
+        failures = evaluate_assertions(result, {})
+        assert failures == []
+
+    def test_multiple_assertions(self):
+        from scripts.run_golden import evaluate_assertions
+
+        result = _make_turn_result(narration="Short.")
+        failures = evaluate_assertions(
+            result,
+            {
+                "narrator_not_empty": True,
+                "narrator_word_count_min": 100,
+                "characters_responded_min": 1,
+            },
+        )
+        # narrator_not_empty passes, but word_count_min and characters_responded_min fail
+        assert len(failures) == 2
+
+
+class TestGoldenScenarioFiles:
+    """Verify the golden scenario YAML files are valid."""
+
+    SCENARIOS_DIR = Path(__file__).parent / "golden_scenarios"
+
+    def test_scenarios_dir_exists(self):
+        assert self.SCENARIOS_DIR.exists()
+
+    def test_all_scenarios_load(self):
+        from scripts.run_golden import load_scenario
+
+        for path in sorted(self.SCENARIOS_DIR.glob("*.yaml")):
+            scenario = load_scenario(path)
+            assert "name" in scenario, f"{path.name}: missing 'name'"
+            assert "game" in scenario, f"{path.name}: missing 'game'"
+            assert "turns" in scenario, f"{path.name}: missing 'turns'"
+            assert len(scenario["turns"]) > 0, f"{path.name}: no turns defined"
+
+    def test_expected_scenarios_present(self):
+        names = {p.stem for p in self.SCENARIOS_DIR.glob("*.yaml")}
+        expected = {
+            "crash_opening",
+            "maya_dialogue",
+            "short_input",
+            "adversarial_input",
+            "both_characters",
+        }
+        assert expected.issubset(names), f"Missing scenarios: {expected - names}"
+
+    def test_all_scenarios_reference_valid_game(self):
+        from scripts.run_golden import load_scenario
+
+        for path in sorted(self.SCENARIOS_DIR.glob("*.yaml")):
+            scenario = load_scenario(path)
+            assert scenario["game"] == "lost-island", (
+                f"{path.name}: unexpected game '{scenario['game']}'"
+            )
+
+    def test_all_turns_have_expect(self):
+        from scripts.run_golden import load_scenario
+
+        for path in sorted(self.SCENARIOS_DIR.glob("*.yaml")):
+            scenario = load_scenario(path)
+            for i, turn in enumerate(scenario["turns"]):
+                assert "expect" in turn, f"{path.name}: turn {i} missing 'expect'"

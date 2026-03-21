@@ -121,6 +121,61 @@ That's my response."""
         assert result["narration"] == "The hero enters"
 
 
+class TestYAMLRobustness:
+    def test_missing_closing_backticks(self):
+        """Model ran out of tokens, no closing ```."""
+        text = "```yaml\nnarration: |\n  You wake up.\nresponding_characters:\n  - maya\nmood: tense\n"
+        result = parse_yaml_response(text)
+        assert result["narration"].strip() == "You wake up."
+        assert result["responding_characters"] == ["maya"]
+
+    def test_missing_closing_backticks_generic(self):
+        """Generic fence without closing."""
+        text = "```\nnarration: |\n  You look around.\nresponding_characters: []\nmood: calm\n"
+        result = parse_yaml_response(text)
+        assert result["mood"] == "calm"
+
+    def test_tab_indentation(self):
+        """Model uses tabs instead of spaces."""
+        text = "```yaml\nnarration: |\n\tYou see a beach.\nresponding_characters:\n\t- maya\nmood: tense\n```"
+        result = parse_yaml_response(text)
+        assert "beach" in result["narration"]
+
+    def test_missing_newline_block_scalar(self):
+        """Model omits newline after | in block scalar."""
+        text = "```yaml\nnarration: |You wake up on a beach.\nresponding_characters:\n  - maya\nmood: tense\n```"
+        result = parse_yaml_response(text)
+        assert "beach" in result["narration"]
+
+    def test_trailing_prose_after_yaml(self):
+        """Model adds conversational text after YAML block."""
+        text = "```yaml\nnarration: |\n  You wake up.\nresponding_characters:\n  - maya\nmood: tense\n```\n\nI hope this helps! Let me know if you need anything else."
+        result = parse_yaml_response(text)
+        assert result["narration"].strip() == "You wake up."
+
+    def test_multiple_yaml_blocks_takes_last(self):
+        """Model starts a block, gives up, starts again."""
+        text = "```yaml\nnarration: bad\n```\n\nActually:\n```yaml\nnarration: |\n  Correct version.\nresponding_characters:\n  - maya\nmood: tense\n```"
+        result = parse_yaml_response(text)
+        assert "Correct" in result["narration"]
+
+    def test_text_before_yaml_block(self):
+        """Model has preamble before the YAML block."""
+        text = "Here is the response:\n\n```yaml\nnarration: |\n  You look around.\nresponding_characters: []\nmood: calm\n```"
+        result = parse_yaml_response(text)
+        assert result["mood"] == "calm"
+
+    def test_empty_response_raises(self):
+        """Empty string raises YAMLParseError."""
+        with pytest.raises(YAMLParseError):
+            parse_yaml_response("")
+
+    def test_whitespace_only_raises(self):
+        """Whitespace-only raises YAMLParseError."""
+        with pytest.raises(YAMLParseError):
+            parse_yaml_response("   \n  \n  ")
+
+
 class TestValidateYamlFields:
     def test_all_fields_present(self):
         data = {"name": "test", "value": 42}

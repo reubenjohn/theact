@@ -1,0 +1,14 @@
+agent: narrator
+content: |
+  ```yaml
+  narration: |
+    You open your eyes to a world of pain and confusion. Twisted metal
+    surrounds you — the remnants of what was once an airplane cabin.
+    Smoke stings your eyes. Through the haze, you can make out
+    tropical vegetation beyond the torn fuselage.
+  responding_characters:
+    - maya
+  mood: tense
+  ```
+finish_reason: stop
+parse_success: true

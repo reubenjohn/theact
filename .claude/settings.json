@@ -14,7 +14,8 @@
       "Bash(uv run:*)",
       "Bash(npx playwright:*)",
       "Read(//home/reuben/.cache/ms-playwright/**)",
-      "Bash(npx -y @playwright/mcp@latest --headless)"
+      "Bash(npx -y @playwright/mcp@latest --headless)",
+      "mcp__playwright__browser_navigate"
     ]
   }
 }

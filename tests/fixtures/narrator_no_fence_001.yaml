@@ -1,0 +1,8 @@
+agent: narrator
+content: |
+  narration: |
+    The beach stretches before you, empty and vast.
+  responding_characters: []
+  mood: calm
+finish_reason: stop
+parse_success: true

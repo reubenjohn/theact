@@ -1,6 +1,7 @@
-"""Git-based save versioning: init, commit, undo, history."""
+"""Git-based save versioning: init, commit, undo, history, fork, peek, diff."""
 
 import re
+import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -127,3 +128,128 @@ def get_history(save_path: Path) -> list[TurnInfo]:
 def get_turn_count(save_path: Path) -> int:
     """Get the number of completed turns (number of turn commits)."""
     return len(get_history(save_path))
+
+
+def save_as(save_path: Path, new_save_id: str, saves_dir: Path | None = None) -> Path:
+    """Copy an entire save directory (including .git/ history) to a new location.
+
+    Enables non-destructive forking: copy first, then undo on the copy.
+
+    Args:
+        save_path: Existing save directory
+        new_save_id: Name for the new save directory
+        saves_dir: Parent directory for saves (defaults to save_path.parent)
+
+    Returns:
+        Path to the new save directory
+
+    Raises:
+        FileExistsError: If target already exists
+        FileNotFoundError: If source doesn't exist
+    """
+    if not save_path.exists():
+        raise FileNotFoundError(f"Source save not found: {save_path}")
+
+    parent = saves_dir or save_path.parent
+    target_dir = parent / new_save_id
+
+    if target_dir.exists():
+        raise FileExistsError(f"Save already exists: {target_dir}")
+
+    shutil.copytree(save_path, target_dir)
+    return target_dir
+
+
+def _resolve_turn_ref(save_path: Path, turn_number: int) -> str:
+    """Resolve a turn number to a git commit ref (hex SHA).
+
+    Turn 0 = the initial commit (before any turns).
+    Turn N = the commit for turn N.
+
+    Raises ValueError if the turn number is out of range.
+    """
+    repo = Repo(save_path)
+    history = get_history(save_path)
+
+    if turn_number == 0:
+        # Find the initial commit (the oldest one, which has no Turn prefix)
+        all_commits = list(repo.iter_commits())
+        if not all_commits:
+            raise ValueError("Repository has no commits")
+        return all_commits[-1].hexsha
+
+    # Find the matching turn in history
+    for info in history:
+        if info.turn == turn_number:
+            return info.commit_hash
+
+    max_turn = history[0].turn if history else 0
+    raise ValueError(f"Turn {turn_number} not found. Valid range: 0-{max_turn}")
+
+
+def peek_at_turn(save_path: Path, turn_number: int) -> dict[str, str]:
+    """Read-only access to any historical turn's state WITHOUT modifying HEAD.
+
+    Uses ``git show <ref>:<path>`` to read file contents at specific commits.
+
+    Args:
+        save_path: Save directory (must be git repo)
+        turn_number: Turn to peek at (0 = initial state before any turns)
+
+    Returns:
+        Dict mapping filename to content for key game state files.
+        Keys include: ``state.yaml``, ``conversation.yaml``, ``summaries.yaml``,
+        plus ``memory/<name>.yaml`` entries.
+
+    Raises:
+        ValueError: If turn_number is out of range
+    """
+    ref = _resolve_turn_ref(save_path, turn_number)
+    repo = Repo(save_path)
+
+    result: dict[str, str] = {}
+
+    # Core state files
+    core_files = ["state.yaml", "conversation.yaml", "summaries.yaml"]
+    for filepath in core_files:
+        try:
+            content = repo.git.show(f"{ref}:{filepath}")
+            result[filepath] = content
+        except Exception:
+            # File may not exist at that commit
+            pass
+
+    # Memory files: discover via ls-tree
+    try:
+        tree_output = repo.git.ls_tree("-r", "--name-only", ref)
+        for line in tree_output.splitlines():
+            if line.startswith("memory/") and line.endswith(".yaml"):
+                try:
+                    content = repo.git.show(f"{ref}:{line}")
+                    result[line] = content
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    return result
+
+
+def diff_turns(save_path: Path, turn_a: int, turn_b: int) -> str:
+    """Show what changed between two turns using git diff.
+
+    Only diffs mutable state files (state.yaml, conversation.yaml,
+    summaries.yaml, memory/).
+
+    Returns:
+        Unified diff text (empty string if no differences)
+
+    Raises:
+        ValueError: If either turn is out of range
+    """
+    ref_a = _resolve_turn_ref(save_path, turn_a)
+    ref_b = _resolve_turn_ref(save_path, turn_b)
+    repo = Repo(save_path)
+
+    diff_paths = ["state.yaml", "conversation.yaml", "summaries.yaml", "memory/"]
+    return repo.git.diff(ref_a, ref_b, "--", *diff_paths)
