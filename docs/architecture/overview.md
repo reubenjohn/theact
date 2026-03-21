@@ -43,12 +43,13 @@ graph TB
     subgraph Foundations
         models["models/\nPydantic data models"]
         llm["llm/\nLLM client, streaming,\nparsing, tokens"]
-        io["io/\nYAML I/O, save manager"]
+        io["io/\nYAML I/O, save manager,\nsettings store"]
     end
     subgraph Core
         engine["engine/\nTurn orchestration,\ncontext assembly"]
         agents["agents/\nNarrator, character,\nmemory, game state"]
         versioning["versioning/\nGit operations"]
+        commands["commands/\nShared command logic"]
     end
     subgraph Frontends
         cli["cli/\nRich terminal UI"]
@@ -63,6 +64,9 @@ graph TB
     io --> engine
     agents --> engine
     versioning --> engine
+    versioning --> commands
+    commands --> cli
+    commands --> web
     engine --> cli
     engine --> web
     engine --> playtest
@@ -70,7 +74,7 @@ graph TB
     models --> creator
 ```
 
-Dependency flow is strictly layered. **Foundations** have no business logic — they handle data shapes, LLM communication, and file I/O. **Core** builds on foundations to implement turn orchestration and agent logic. **Frontends** consume the engine and never talk to each other.
+Dependency flow is strictly layered. **Foundations** have no business logic — they handle data shapes, LLM communication, and file I/O. **Core** builds on foundations to implement turn orchestration, agent logic, and shared command logic. The `commands/` module contains pure functions (no UI imports) that both CLI and web frontends call. **Frontends** consume the engine and commands, and never talk to each other.
 
 ## Concurrency Model
 
@@ -101,6 +105,31 @@ Both the CLI and web UI consume the same `run_turn()` interface. The engine does
 | Turn Debugger | `src/theact/debugger/` | Interactive — step through agents one at a time |
 
 The playtest framework and turn debugger also consume `run_turn()`, making them first-class frontends rather than special-cased tools.
+
+### Web UI Architecture
+
+The web UI uses a modular architecture with separated concerns:
+
+- **`GameSessionState`** (`state.py`) — shared observable state. All components read from it and register listeners for automatic updates. Components never mutate state directly.
+- **`TurnRunner`** (`turn_runner.py`) — wraps `run_turn()`, returns `TurnResult` without handling UI.
+- **`StreamRenderer`** (`streaming.py`) — routes streaming tokens from the engine to UI blocks.
+- **`CommandRouter`** (`command_router.py`) — dispatches slash commands to shared logic in `src/theact/commands/` and renders results.
+- **`components/`** — reusable UI components (turn cards, message blocks, thinking panels, dialogs, HTML utilities).
+
+Feature modules extend the core:
+
+| Module | Description |
+|---|---|
+| `toolbar.py` | Quick-action button bar (undo, retry, save-as, history) |
+| `sidebar.py` | Collapsible right panel with character cards, chapter progress, memory |
+| `history.py` | Turn history timeline with peek and diff viewers |
+| `creator_wizard.py` | Multi-step game creation stepper |
+| `settings.py` | LLM and display configuration page |
+| `playtest_dashboard.py` | Launch, monitor, and review playtests |
+| `diagnostics_viewer.py` | Call log browser, token charts, error viewer |
+| `safety.py` | Multi-tab file locking and session recovery |
+
+Command logic is shared between CLI and web via `src/theact/commands/logic.py`, which contains pure functions with no UI imports. Both frontends are thin rendering layers over this shared logic.
 
 ## See Also
 

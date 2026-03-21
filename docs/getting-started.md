@@ -74,7 +74,19 @@ uv sync --extra web
 uv run python -m theact.web
 ```
 
-Opens at [localhost:8080](http://localhost:8080).
+Opens at [localhost:8080](http://localhost:8080). The web UI provides the same gameplay as the CLI plus several web-native features:
+
+- **Gameplay toolbar** — quick-action buttons for undo, retry, save-as, history, and sidebar toggle (no slash commands needed)
+- **Game state sidebar** — collapsible right panel showing active characters, chapter progress, and character memory
+- **Turn history browser** — visual timeline with peek/diff viewers for any past turn
+- **Game creation wizard** — multi-step stepper interface for creating new games via the creator agent
+- **Playtest dashboard** — launch, monitor, and review autonomous playtests
+- **Diagnostics viewer** — browse LLM call logs, token usage, and parse errors
+- **Settings page** — configure LLM endpoint, model, and display preferences at `/settings`
+
+### Settings
+
+The web UI settings page (`/settings`) lets you configure LLM connection details, creator model settings, and display preferences without editing files. Settings are saved to `settings.yaml` (in your data directory or working directory). Note that `settings.yaml` stores non-secret configuration; API keys should still go in `.env`.
 
 ## See Also
 

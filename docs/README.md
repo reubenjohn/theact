@@ -6,7 +6,7 @@ New here? Start with [Core Concepts](concepts.md), then [Getting Started](gettin
 
 | Document | Description |
 |----------|-------------|
-| [Getting Started](getting-started.md) | Install, configure, play your first game |
+| [Getting Started](getting-started.md) | Install, configure, play your first game (CLI and Web UI) |
 | [Creating a Game](guides/creating-a-game.md) | Write game YAML files or use the creator agent |
 
 ## Understanding the System
@@ -36,4 +36,4 @@ New here? Start with [Core Concepts](concepts.md), then [Getting Started](gettin
 | [Game Creation Pipeline](reference/game-creation-pipeline.md) | Creator agent internals |
 | [Requirements & Rationale](reference/requirements.md) | Why design decisions were made |
 | [Model Quirks](reference/model-quirks.yaml) | Observed 7B model behaviors and workarounds |
-| [Phase Plans](plans/) | Step-by-step implementation plans (01-11) |
+| [Phase Plans](plans/) | Step-by-step implementation plans (01-13) |

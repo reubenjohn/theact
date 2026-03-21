@@ -24,16 +24,17 @@ Player Input → Context Assembly (code) → Narrator Agent (streaming)
 
 Code layout:
 - `src/theact/models/` — Pydantic data models
-- `src/theact/io/` — YAML I/O, save manager
+- `src/theact/io/` — YAML I/O, save manager, settings persistence (`settings_store.py`)
 - `src/theact/versioning/` — Git-based save versioning (`save_as`, `peek_at_turn`, `diff_turns`)
 - `src/theact/llm/` — LLM client, streaming, structured output, call logging, profiler
 - `src/theact/engine/` — Turn engine, context assembly, diagnostics writer
 - `src/theact/agents/` — Narrator, character, memory, game state, summarizer agents
 - `src/theact/debugger/` — Interactive turn debugger for prompt engineering
 - `src/theact/cli/` — Rich terminal CLI
+- `src/theact/commands/` — Shared command logic (pure functions, no UI imports) used by both CLI and web
 - `src/theact/playtest/` — Autonomous playtest framework with quality scoring
 - `src/theact/creator/` — Game creation agent
-- `src/theact/web/` — NiceGUI web interface
+- `src/theact/web/` — NiceGUI web interface (modular: `state.py`, `turn_runner.py`, `streaming.py`, `command_router.py`, `components/`, plus feature modules for toolbar, sidebar, history, creator wizard, settings, playtest dashboard, diagnostics viewer, and safety)
 
 ## Documentation
 
@@ -76,6 +77,8 @@ Detailed phase-by-phase plans are in `docs/plans/`. Read them in order:
 9. `09-ObservabilityAndDiagnostics.md` — Call logging, diagnostics, profiler, error taxonomy
 10. `10-SaveVersioningAndTurnDebugger.md` — Save forking, history peek/diff, interactive debugger
 11. `11-SmallModelHardening.md` — Prompt iteration, YAML reliability, golden scenarios
+12. `12-CreatorSmallModelHardening.md` — Brainstorm tool, decomposed proposal & generation, per-file fixing
+13. `13-WebUIExpansion/` — Web UI expansion: toolbar, sidebar, history, creator wizard, settings, playtest dashboard, diagnostics viewer, polish & safety
 
 ## Commands
 

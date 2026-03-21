@@ -22,7 +22,7 @@ TheAct is built in sequential phases. Each plan document is self-contained with 
 | 10 | [10-SaveVersioningAndTurnDebugger.md](10-SaveVersioningAndTurnDebugger.md) | Save-as/fork, peek, diff, interactive turn debugger | 01, 03, 09 |
 | 11 | [11-SmallModelHardening.md](11-SmallModelHardening.md) | Prompt iteration, YAML reliability, token budgets, golden scenarios | 09, 10 |
 | 12 | [12-CreatorSmallModelHardening.md](12-CreatorSmallModelHardening.md) | Brainstorm tool, decomposed proposal & generation, per-file fixing for small models | 06, 11 |
-| 13 | [13-WebUIExpansion/](13-WebUIExpansion/README.md) | Web UI expansion: toolbar, sidebar, history, creator wizard, settings, playtest, diagnostics, polish | 07, 01–12 |
+| 13 | [13-WebUIExpansion/](13-WebUIExpansion/README.md) | **Implemented.** Web UI expansion: toolbar, sidebar, history, creator wizard, settings, playtest dashboard, diagnostics viewer, polish & safety | 07, 01–12 |
 
 ## Cross-Cutting Implementation Notes
 
@@ -62,6 +62,18 @@ Phases 01-07 are fully implemented. 396 tests pass. Here is critical context for
 **Build order for 09-11:** Phase 09 and Phase 10 Part A (save versioning) are independent — can be built in parallel. Phase 10 Part B (turn debugger) benefits from Phase 09's `LLMCallLog` but degrades gracefully without it. Phase 11 depends on both 09 and 10 being operational.
 
 **Existing diagnostic tooling:** `scripts/diagnose_agent.py` already exists and tests individual agents against the live API. `scripts/test_turn.py` runs 3-turn integration tests. `scripts/playtest.py` runs autonomous N-turn playtests. Phase 09 enhances these with structured logging; Phase 10 adds interactive debugging.
+
+### Phase 13: Context from implementation
+
+Phases 01-13 are fully implemented. Key decisions and patterns from Phase 13:
+
+**Shared command logic.** Step 00 extracted command logic into `src/theact/commands/logic.py` — pure functions with no UI imports. Both CLI and web are thin rendering layers over this shared logic. This pattern prevents business logic from drifting into UI code.
+
+**Observable state pattern.** `GameSessionState` (`src/theact/web/state.py`) is the single source of truth for the web UI. Components register as listeners and refresh automatically when state changes (after turns, undo, game reload). Components never mutate state directly.
+
+**Settings persistence.** `settings.yaml` stores web-configurable settings (LLM endpoint, model, display preferences). The settings store lives in `src/theact/io/settings_store.py` (not in `web/`) so both `llm/config.py` and the web layer can import it without creating a core-to-web dependency. Load order: `.env` (secrets via dotenv) then `settings.yaml` overrides.
+
+**File locking.** `safety.py` uses the `filelock` package to prevent concurrent writes from multiple browser tabs to the same save directory. Falls back to a no-op lock if `filelock` is not installed.
 
 ---
 
