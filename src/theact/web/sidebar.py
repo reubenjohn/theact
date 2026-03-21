@@ -54,7 +54,7 @@ class GameStateSidebar:
                 ui.column()
                 .classes(
                     "w-[300px] min-w-[300px] h-full border-l border-gray-700 "
-                    "overflow-y-auto p-3"
+                    "overflow-y-auto p-3 game-sidebar"
                 )
                 .style("background-color: #111827; max-height: 100vh;")
                 .props('data-testid="game-sidebar"')

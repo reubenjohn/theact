@@ -5,6 +5,7 @@ Delegates to:
   - StreamRenderer for token routing
   - CommandRouter for slash commands
   - GameSessionState for shared state
+  - SaveLock for multi-tab safety
 
 Owns the UI layout (header, chat area, input bar) and the main
 input loop (_on_submit). Everything else is delegated.
@@ -23,6 +24,7 @@ from theact.web.components.message_blocks import create_player_block
 from theact.web.components.static_turn import render_static_turn
 from theact.web.components.turn_card import create_turn_card, create_turn_info_bar
 from theact.web.history import TurnHistoryBrowser
+from theact.web.safety import SaveLock
 from theact.web.sidebar import GameStateSidebar
 from theact.web.state import GameSessionState
 from theact.web.streaming import StreamRenderer
@@ -73,6 +75,10 @@ class GameplaySession:
         self._turn_runner = TurnRunner(self._state)
         self._command_router: CommandRouter | None = None
 
+        # Save locking for multi-tab safety
+        self._save_lock: SaveLock | None = None
+        self._read_only = False
+
         # UI references (set during build)
         self._chat_scroll: ui.scroll_area | None = None
         self._chat_area: ui.column | None = None
@@ -85,6 +91,7 @@ class GameplaySession:
         self._sidebar: GameStateSidebar | None = None
         self._history_browser: TurnHistoryBrowser | None = None
         self._cmd_menu: ui.menu | None = None
+        self._open_dialogs: list[ui.dialog] = []
 
     # --- Public properties for backward compat ---
 
@@ -110,17 +117,26 @@ class GameplaySession:
 
     def build(self, container: ui.element) -> None:
         """Build the gameplay UI inside the given container."""
+        # Acquire save lock for multi-tab safety
+        self._acquire_save_lock()
+
+        # Inject responsive CSS and keyboard shortcut prevention
+        self._inject_responsive_css()
+        self._inject_shortcut_prevention_js()
+
         with container:
             # Outer wrapper: full-width row with chat column + sidebar
             self._gameplay_container = (
-                ui.row().classes("w-full max-w-6xl mx-auto").style("min-height: 100vh;")
+                ui.row()
+                .classes("w-full max-w-6xl mx-auto gameplay-container")
+                .style("min-height: 100vh;")
             )
 
             with self._gameplay_container:
                 # --- Main chat column (takes remaining space) ---
                 chat_column = (
                     ui.column()
-                    .classes("flex-grow h-full overflow-hidden")
+                    .classes("flex-grow h-full overflow-hidden chat-column")
                     .style("min-height: 100vh;")
                 )
 
@@ -160,6 +176,13 @@ class GameplaySession:
             )
             self._history_browser.build(container)
 
+        # Setup keyboard shortcuts
+        self._setup_keyboard_shortcuts()
+
+        # Register lock cleanup on tab close
+        if self._save_lock and self._save_lock.is_locked:
+            ui.context.client.on_delete(self._release_save_lock)
+
         self._command_router = CommandRouter(self._state, self._chat_area)
         self._render_history()
 
@@ -188,7 +211,7 @@ class GameplaySession:
 
             ui.button(icon="info", on_click=self._toggle_sidebar).props(
                 'flat dense aria-label="Toggle game state sidebar"'
-            ).tooltip("Toggle game state sidebar").style("color: #999;")
+            ).tooltip("Toggle game state sidebar (Ctrl+B)").style("color: #999;")
 
             ui.button("Menu", on_click=self._handle_quit, icon="home").props(
                 "flat dense"
@@ -198,7 +221,7 @@ class GameplaySession:
         """Build the input bar with text field, send button, and command hints."""
         with (
             ui.row()
-            .classes("w-full items-center p-2 gap-2")
+            .classes("w-full items-center p-2 gap-2 input-bar")
             .style("border-top: 1px solid #444;")
         ):
             # Command hint menu (hidden by default)
@@ -292,6 +315,13 @@ class GameplaySession:
 
     async def _play_turn(self, player_input: str) -> None:
         """Execute a turn with streaming."""
+        if self._read_only:
+            ui.notify(
+                "This save is open read-only. Cannot submit turns.",
+                type="warning",
+            )
+            return
+
         self._state.last_player_input = player_input
         self._lock_input()
 
@@ -308,6 +338,8 @@ class GameplaySession:
             chat_scroll=self._chat_scroll,
         )
 
+        post_turn_row = None
+
         try:
             with turn_card:
                 spinner_row = ui.row().classes("items-center gap-2")
@@ -322,6 +354,17 @@ class GameplaySession:
             )
 
             renderer.finish()
+
+            # Show post-turn processing indicator
+            with turn_card:
+                post_turn_row = ui.row().classes(
+                    "items-center gap-2 post-turn-indicator"
+                )
+                with post_turn_row:
+                    ui.spinner("dots", size="sm")
+                    ui.label("Updating world state...").style(
+                        "color: #888; font-size: 0.8em;"
+                    )
 
             create_player_block(
                 turn_card, self._state.game.state.player_name, player_input
@@ -346,14 +389,15 @@ class GameplaySession:
         except Exception as e:
             logger.exception("Error during turn")
             renderer.finish()
-            with turn_card:
-                ui.label(f"Error: {e}").style("color: #ff5252; margin-top: 8px;")
+            self._show_turn_error(turn_card, str(e), player_input)
             try:
                 self._state.reload_game()
             except Exception:
                 logger.exception("Failed to reload game from disk")
 
         finally:
+            if post_turn_row is not None:
+                post_turn_row.delete()
             spinner_row.set_visibility(False)
             self._unlock_input()
             if self._chat_scroll:
@@ -416,6 +460,7 @@ class GameplaySession:
 
     def _handle_quit(self) -> None:
         """Return to the main menu."""
+        self._release_save_lock()
         if self._on_quit:
             self._on_quit()
 
@@ -523,3 +568,215 @@ class GameplaySession:
         """If this is a fresh game (turn 0), auto-play the opening."""
         if self._state.game.state.turn == 0:
             await self._play_turn("[game start]")
+
+    # --- Save locking ---
+
+    def _acquire_save_lock(self) -> None:
+        """Try to acquire exclusive lock on the save directory."""
+        self._save_lock = SaveLock(self._state.game.save_path)
+        if not self._save_lock.acquire():
+            self._show_lock_conflict_dialog()
+
+    def _release_save_lock(self) -> None:
+        """Release the save lock if held."""
+        if self._save_lock:
+            self._save_lock.release()
+
+    def _show_lock_conflict_dialog(self) -> None:
+        """Show dialog when save is locked by another tab."""
+        with ui.dialog() as dlg, ui.card():
+            ui.label("Save is open in another tab").style(
+                "font-weight: bold; color: #ccc;"
+            )
+            ui.label(
+                "This save appears to be open elsewhere. "
+                "Opening it here may cause data corruption."
+            ).style("color: #999;")
+            with ui.row().classes("justify-end gap-2 mt-2"):
+                ui.button(
+                    "Open Read-Only",
+                    on_click=lambda: self._enter_readonly(dlg),
+                ).props("flat").style("color: #42a5f5;")
+                ui.button(
+                    "Force Unlock",
+                    on_click=lambda: self._force_unlock(dlg),
+                ).props("flat").style("color: #ffa726;")
+                ui.button(
+                    "Back to Menu",
+                    on_click=lambda: self._back_to_menu(dlg),
+                ).props("flat").style("color: #999;")
+        self._open_dialogs.append(dlg)
+        dlg.open()
+
+    def _enter_readonly(self, dlg: ui.dialog) -> None:
+        """Enter read-only mode (no turns, no commands that write)."""
+        dlg.close()
+        self._read_only = True
+        ui.notify("Opened in read-only mode.", type="info")
+
+    def _force_unlock(self, dlg: ui.dialog) -> None:
+        """Force-acquire the lock, breaking any existing hold."""
+        dlg.close()
+        if self._save_lock and self._save_lock.force_acquire():
+            self._read_only = False
+            ui.notify("Lock acquired. You have full control.", type="positive")
+        else:
+            ui.notify("Failed to acquire lock.", type="negative")
+            self._read_only = True
+
+    def _back_to_menu(self, dlg: ui.dialog) -> None:
+        """Close dialog and return to menu."""
+        dlg.close()
+        if self._on_quit:
+            self._on_quit()
+
+    # --- Keyboard shortcuts ---
+
+    def _setup_keyboard_shortcuts(self) -> None:
+        """Register keyboard shortcuts for common actions."""
+        ui.keyboard(on_key=self._handle_key, ignore=[])
+
+    async def _handle_key(self, e) -> None:
+        """Handle keyboard shortcuts. Only acts on modifier combos."""
+        if not e.action.keydown:
+            return
+
+        if e.modifiers.ctrl or e.modifiers.meta:
+            if e.key == "z":
+                await self._shortcut_undo()
+            elif e.key == "s":
+                self._shortcut_save_as()
+            elif e.key == "h":
+                self._shortcut_toggle_history()
+            elif e.key == "b":
+                self._shortcut_toggle_sidebar()
+        elif e.key.escape:
+            self._close_open_dialogs()
+
+    async def _shortcut_undo(self) -> None:
+        """Ctrl+Z: show undo confirmation dialog."""
+        if self._state.processing or self._read_only:
+            return
+        from theact.web.components.dialogs import confirm_dialog
+
+        confirm_dialog(
+            title="Undo Last Turn",
+            message="Undo the most recent turn? This cannot be reversed.",
+            on_confirm=lambda: self._toolbar_undo(1),
+            confirm_text="Undo",
+            confirm_color="#ff9800",
+        )
+
+    def _shortcut_save_as(self) -> None:
+        """Ctrl+S: open save-as dialog."""
+        if self._state.processing:
+            return
+        if self._toolbar:
+            self._toolbar._show_save_as_dialog()
+
+    def _shortcut_toggle_history(self) -> None:
+        """Ctrl+H: toggle history browser."""
+        self._toolbar_history()
+
+    def _shortcut_toggle_sidebar(self) -> None:
+        """Ctrl+B: toggle sidebar."""
+        self._toggle_sidebar()
+
+    def _close_open_dialogs(self) -> None:
+        """Escape: close any open dialogs and the history browser."""
+        for dlg in self._open_dialogs:
+            try:
+                dlg.close()
+            except Exception:
+                pass
+        self._open_dialogs.clear()
+
+        if self._history_browser and self._history_browser._dialog:
+            if self._history_browser._dialog.value:
+                self._history_browser.close()
+
+    # --- Error retry ---
+
+    def _show_turn_error(
+        self, turn_card: ui.element, error_msg: str, player_input: str
+    ) -> None:
+        """Show error with retry button in the turn card."""
+        with turn_card:
+            ui.label(f"Error: {error_msg}").style("color: #ff5252; margin-top: 8px;")
+            ui.button(
+                "Retry",
+                icon="refresh",
+                on_click=lambda: self._retry_failed_turn(player_input),
+            ).props("flat dense").style("color: #ffa726; margin-top: 4px;").tooltip(
+                "Retry with the same input"
+            )
+
+    async def _retry_failed_turn(self, player_input: str) -> None:
+        """Retry a failed turn: reload state from disk and replay."""
+        try:
+            self._state.reload_game()
+        except Exception:
+            logger.exception("Failed to reload game for retry")
+            ui.notify("Could not reload game state.", type="negative")
+            return
+
+        # Re-render conversation history (removes the failed turn card)
+        self._chat_area.clear()
+        self._render_history()
+        self._update_header()
+
+        # Replay the turn
+        await self._play_turn(player_input)
+
+    # --- Responsive CSS ---
+
+    def _inject_responsive_css(self) -> None:
+        """Inject responsive CSS media queries for mobile/tablet layouts."""
+        ui.add_css("""
+/* Mobile: <768px */
+@media (max-width: 767px) {
+    .game-sidebar {
+        display: none !important;
+    }
+    .turn-card {
+        padding: 0.5rem !important;
+    }
+    .input-bar {
+        flex-direction: column;
+    }
+    .input-bar .q-input {
+        width: 100% !important;
+    }
+    .input-bar .q-btn {
+        width: 100% !important;
+        margin-top: 0.25rem;
+    }
+    .toolbar-extras {
+        display: none !important;
+    }
+    .gameplay-container {
+        flex-direction: column !important;
+    }
+}
+
+/* Tablet: 768-1024px */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .game-sidebar {
+        width: 250px !important;
+        min-width: 250px !important;
+    }
+    .toolbar-extras {
+        display: none !important;
+    }
+}
+""")
+
+    def _inject_shortcut_prevention_js(self) -> None:
+        """Inject JavaScript to prevent browser defaults for shortcuts."""
+        ui.run_javascript("""
+document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && ['s', 'h', 'b'].includes(e.key)) {
+        e.preventDefault();
+    }
+});
+""")

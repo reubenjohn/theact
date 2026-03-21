@@ -57,7 +57,7 @@ class GameplayToolbar:
                 self._undo_btn = (
                     ui.button(icon="undo", on_click=self._show_undo_dialog)
                     .props('flat dense data-testid="toolbar-undo"')
-                    .tooltip("Undo last turn")
+                    .tooltip("Undo last turn (Ctrl+Z)")
                     .style("color: #999;")
                 )
                 self._retry_btn = (
@@ -69,13 +69,13 @@ class GameplayToolbar:
                 self._save_as_btn = (
                     ui.button(icon="fork_right", on_click=self._show_save_as_dialog)
                     .props('flat dense data-testid="toolbar-save-as"')
-                    .tooltip("Fork save")
+                    .tooltip("Fork save (Ctrl+S)")
                     .style("color: #999;")
                 )
                 self._history_btn = (
                     ui.button(icon="history", on_click=self._handle_history)
                     .props('flat dense data-testid="toolbar-history"')
-                    .tooltip("Turn history")
+                    .tooltip("Turn history (Ctrl+H)")
                     .style("color: #999;")
                 )
 

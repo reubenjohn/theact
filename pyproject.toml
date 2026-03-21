@@ -23,6 +23,7 @@ Issues = "https://github.com/reubenvjohn/theact/issues"
 [project.optional-dependencies]
 web = [
     "nicegui>=3.9.0",
+    "filelock>=3.12",
 ]
 
 [build-system]
