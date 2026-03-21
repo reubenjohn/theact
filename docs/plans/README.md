@@ -21,6 +21,7 @@ TheAct is built in sequential phases. Each plan document is self-contained with 
 | 09 | [09-ObservabilityAndDiagnostics.md](09-ObservabilityAndDiagnostics.md) | LLM call logging, diagnostics filesystem, prompt linting, error taxonomy | 01–05 |
 | 10 | [10-SaveVersioningAndTurnDebugger.md](10-SaveVersioningAndTurnDebugger.md) | Save-as/fork, peek, diff, interactive turn debugger | 01, 03, 09 |
 | 11 | [11-SmallModelHardening.md](11-SmallModelHardening.md) | Prompt iteration, YAML reliability, token budgets, golden scenarios | 09, 10 |
+| 12 | [12-CreatorSmallModelHardening.md](12-CreatorSmallModelHardening.md) | Brainstorm tool, decomposed proposal & generation, per-file fixing for small models | 06, 11 |
 
 ## Cross-Cutting Implementation Notes
 
@@ -202,4 +203,27 @@ After each prompt change:
 After all steps:
   uv run python scripts/playtest.py --game lost-island --turns 20
 Review the report against the success criteria in Section 17 of the plan.
+```
+
+**Phase 12** — append:
+```
+This phase has three components that should be built in order:
+1. Brainstorm tool (standalone, no dependencies on other changes)
+2. Decomposed proposal (rewrites proposer.py, updates session.py)
+3. Decomposed generation pipeline (new per-file generators, updated fixer)
+
+Use subagents:
+  - Subagent 1: Implement brainstorm.py + scripts/brainstorm.py
+  - Subagent 2: Implement per-file generators (world_gen.py, character_gen.py, chapter_gen.py)
+  - Subagent 3: Implement assembler.py + pipeline.py
+  - Main context: Prompt rewrite, session integration, fixer updates
+
+NAMING CAUTION: The plan has two sets of similarly-named prompts:
+  - Proposal phase: SETTING_SYSTEM, PROPOSAL_CHARACTERS_SYSTEM, PROPOSAL_CHAPTERS_SYSTEM
+  - Generation phase: WORLD_SYSTEM, CHARACTER_SYSTEM, CHAPTER_SYSTEM
+Keep the "PROPOSAL_" prefix on proposal-phase prompts to avoid confusion.
+
+After implementation, test with the 7B model:
+  CREATOR_MODEL=olafangensan-glm-4.7-flash-heretic uv run python scripts/brainstorm.py --create
+  uv run python scripts/playtest.py --game <created-game-id> --turns 10
 ```

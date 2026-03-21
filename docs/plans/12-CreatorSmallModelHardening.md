@@ -705,7 +705,7 @@ The user reviews and iterates: "make it darker", "change the setting to the 1920
 Once setting is approved, generate character sketches:
 
 ```python
-CHARACTERS_SYSTEM = """\
+PROPOSAL_CHARACTERS_SYSTEM = """\
 You are a game designer. Given a game setting, propose characters.
 
 Output YAML:
@@ -728,7 +728,7 @@ The user sees the character list and iterates: "add a villain", "change the doct
 Once characters are approved, generate the chapter outline:
 
 ```python
-CHAPTERS_SYSTEM = """\
+PROPOSAL_CHAPTERS_SYSTEM = """\
 You are a game designer. Given a game setting and characters, outline the chapters.
 
 Output YAML:
@@ -1059,23 +1059,40 @@ async def _revise_targeted(
     # Step 1: Classify which file(s) to change
     targets = await classify_revision_targets(feedback, data, client, config)
 
-    # Step 2: Regenerate each target using the per-file generators
-    # with the user feedback appended to the user prompt.
-    # These call the same generate_world/character/chapter functions
-    # from the pipeline, but with an additional feedback instruction
-    # injected into the user message.
+    # Step 2: Regenerate each target using the per-file generators.
+    # Each generator accepts an optional `feedback: str | None` parameter
+    # that is appended to the user prompt when provided.
     for target in targets:
         if target.file_type == "world":
-            data["world"] = await generate_world_with_feedback(
-                data, feedback, client, config
+            data["world"] = await generate_world(
+                proposal=_proposal_from_data(data),
+                client=client, config=config,
+                feedback=feedback,
             )
         elif target.file_type == "character":
-            data["characters"][target.stem] = await generate_character_with_feedback(
-                data, target.stem, feedback, client, config
+            data["characters"][target.stem] = await generate_character(
+                proposal=_proposal_from_data(data),
+                char_info=_char_info(data, target.stem),
+                all_stems=list(data["characters"].keys()),
+                prior_characters={
+                    k: v for k, v in data["characters"].items()
+                    if k != target.stem
+                },
+                client=client, config=config,
+                feedback=feedback,
             )
         elif target.file_type == "chapter":
-            data["chapters"][target.stem] = await generate_chapter_with_feedback(
-                data, target.stem, feedback, client, config
+            data["chapters"][target.stem] = await generate_chapter(
+                proposal=_proposal_from_data(data),
+                chap_info=_chap_info(data, target.stem),
+                characters=data["characters"],
+                prior_chapters={
+                    k: v for k, v in data["chapters"].items()
+                    if k != target.stem
+                },
+                next_chapter_id=_next_chapter_id(data, target.stem),
+                client=client, config=config,
+                feedback=feedback,
             )
 
     # Step 3: Re-assemble game.yaml and enforce consistency
@@ -1088,20 +1105,38 @@ async def _revise_targeted(
 The classifier call is a tiny LLM call (~100 token prompt):
 
 ```python
+@dataclass
+class RevisionTarget:
+    """A single file targeted for revision."""
+    file_type: str   # "world", "character", or "chapter"
+    stem: str | None # e.g., "maya" or "01-the-crash"; None for world
+
+
 CLASSIFY_SYSTEM = """\
 Given user feedback about a game, identify which file(s) need changes.
 Output YAML:
 
 ```yaml
 targets:
-  - type: "world|character|chapter"
-    key: "file-stem-or-null"
+  - file_type: "world|character|chapter"
+    stem: "file-stem-or-null"
 ```
 
 Only list files that the feedback explicitly mentions or clearly implies."""
+
+
+CLASSIFY_USER = """\
+User feedback: {feedback}
+
+Available files:
+- world (setting, tone, rules)
+{character_list}
+{chapter_list}
+
+Which files need changes?"""
 ```
 
-If the classifier fails or returns ambiguous results, fall back to regenerating all files through the pipeline.
+`classify_revision_targets()` parses the YAML response into a list of `RevisionTarget`. If the classifier fails (YAML parse error, empty response, or ambiguous results), fall back to regenerating all files through the full pipeline.
 
 ---
 
@@ -1159,7 +1194,8 @@ Write tests (mock LLM):
 
 Rewrite all prompts in `prompts.py` for the decomposed pipeline:
 - `BRAINSTORM_SYSTEM` / `BRAINSTORM_SUMMARIZE_SYSTEM` -- new (Section 4.2)
-- `SETTING_SYSTEM` / `CHARACTERS_SYSTEM` / `CHAPTERS_SYSTEM` -- new (Section 4.3)
+- `SETTING_SYSTEM` / `PROPOSAL_CHARACTERS_SYSTEM` / `PROPOSAL_CHAPTERS_SYSTEM` -- new (Section 4.3)
+- `SETTING_REVISION_USER` / `CHARACTERS_REVISION_USER` / `CHAPTERS_REVISION_USER` -- new (Section 4.4)
 - `WORLD_SYSTEM` / `WORLD_USER` -- new (Section 3.3)
 - `CHARACTER_SYSTEM` / `CHARACTER_USER` -- new (Section 3.4)
 - `CHAPTER_SYSTEM` / `CHAPTER_USER` -- new (Section 3.5)
@@ -1198,6 +1234,7 @@ Write tests (mock LLM):
 
 Implement `assembler.py`:
 - `assemble_game_meta()` -- builds game.yaml from generated data
+- `assemble_game_meta_from_data()` -- convenience wrapper for revision/fix contexts
 - `enforce_consistency()` -- code-enforced cross-file fixes
 
 Write tests:
@@ -1206,7 +1243,7 @@ Write tests:
 - `enforce_consistency()` strips invalid character stems from chapters
 - `enforce_consistency()` re-wires broken chapter next-chains
 
-### Step 4: Pipeline Orchestrator
+### Step 6: Pipeline Orchestrator
 
 Implement `pipeline.py`:
 - `run_generation_pipeline()` -- calls generators in sequence
@@ -1339,7 +1376,7 @@ Phase 12 is complete when all of the following pass:
    CREATOR_MODEL=olafangensan-glm-4.7-flash-heretic uv run python -m theact.creator
    ```
    The flow completes without crashing. Generated files pass validation.
-5. **Per-file prompts are under 300 tokens:** Each system prompt (BRAINSTORM_SYSTEM, SETTING_SYSTEM, CHARACTERS_SYSTEM, CHAPTERS_SYSTEM, WORLD_SYSTEM, CHARACTER_SYSTEM, CHAPTER_SYSTEM) is verified under budget by `tests/test_creator_prompts.py`.
+5. **Per-file prompts are under 300 tokens:** Each system prompt (BRAINSTORM_SYSTEM, SETTING_SYSTEM, PROPOSAL_CHARACTERS_SYSTEM, PROPOSAL_CHAPTERS_SYSTEM, WORLD_SYSTEM, CHARACTER_SYSTEM, CHAPTER_SYSTEM) is verified under budget by `tests/test_creator_prompts.py`.
 6. **Size compliance:** Games created by the 7B model pass the same size checks as Phase 06:
    - `world.yaml` under 150 words
    - Each character YAML under 80 words
