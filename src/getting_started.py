@@ -11,7 +11,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="auto",
+    model="olafangensan-glm-4.7-flash-heretic",
     messages=[{"role": "user", "content": "Write a binary search in Python."}],
     temperature=1.0,
     max_tokens=900,
