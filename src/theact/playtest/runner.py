@@ -53,6 +53,7 @@ class PlaytestRunner:
 
         # 2. Load the game
         game = load_save(save_id)
+        self._game_title = game.meta.title
 
         # 2a. Run the opening narration (no player input)
         try:
@@ -151,7 +152,7 @@ class PlaytestRunner:
         report = generate_report(
             logger=self.logger,
             config=self.config,
-            game_title=self.config.game_id,
+            game_title=getattr(self, "_game_title", self.config.game_id),
             total_duration=total_duration,
             memory_final=memory_final,
             call_log=self.call_log,

@@ -32,7 +32,6 @@ class TurnLog:
     prompt_tokens: int = 0
     thinking_tokens: int = 0
     response_tokens: int = 0
-    agent_tokens: dict[str, dict] = field(default_factory=dict)
 
 
 class PlaytestLogger:
@@ -70,17 +69,10 @@ class PlaytestLogger:
         if result.game_state:
             beats_hit = list(result.game_state.beats_hit)
 
-        narrator_thinking = ""
-        if result.narrator and result.narrator.narration:
-            # Thinking is extracted at the inference level, not accessible
-            # from NarratorOutput directly. We capture what we can.
-            pass
-
         log = TurnLog(
             turn=turn,
             player_input=player_input,
             narrator_text=result.narrator.narration if result.narrator else "",
-            narrator_thinking=narrator_thinking,
             character_texts=char_texts,
             character_thinking=char_thinking,
             characters_responded=chars_responded,

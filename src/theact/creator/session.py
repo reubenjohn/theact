@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
 from openai import AsyncOpenAI
 from rich.console import Console
 
@@ -16,8 +15,13 @@ from theact.creator.display import (
     display_validation_errors,
 )
 from theact.creator.fixer import fix_validation_errors
-from theact.creator.generator import YAMLParseError, _parse_generation_response
-from theact.creator.generator import generate_game_files
+from theact.creator.generator import (
+    YAMLParseError,
+    _parse_generation_response,
+    call_llm,
+    generate_game_files,
+    serialize_game_data,
+)
 from theact.creator.prompts import GENERATION_SYSTEM, TARGETED_REVISION_USER
 from theact.creator.proposer import generate_proposal, revise_proposal
 from theact.creator.validator import check_size_warnings, validate_game_data
@@ -142,7 +146,7 @@ async def _revise_and_validate(
     TARGETED_REVISION_USER, then parses the response. If YAML parsing
     fails, retries up to 2 times. Returns the (possibly revised) data dict.
     """
-    yaml_text = _serialize_game_data(data)
+    yaml_text = serialize_game_data(data)
     messages: list[dict] = [
         {"role": "system", "content": GENERATION_SYSTEM},
         {
@@ -155,7 +159,7 @@ async def _revise_and_validate(
     ]
 
     for attempt in range(3):
-        response = await _call_llm(client, config, messages)
+        response = await call_llm(client, config, messages)
         try:
             return _parse_generation_response(response)
         except YAMLParseError as e:
@@ -187,24 +191,4 @@ def _create_client(config: CreatorLLMConfig) -> AsyncOpenAI:
     return AsyncOpenAI(
         base_url=config.base_url,
         api_key=config.api_key,
-    )
-
-
-async def _call_llm(
-    client: AsyncOpenAI, config: CreatorLLMConfig, messages: list[dict]
-) -> str:
-    """Call the LLM and return the response text content."""
-    response = await client.chat.completions.create(
-        model=config.model,
-        messages=messages,
-        temperature=config.temperature,
-        max_tokens=config.max_tokens,
-    )
-    return response.choices[0].message.content or ""
-
-
-def _serialize_game_data(data: dict) -> str:
-    """Serialize a game data dict to a YAML string for prompt injection."""
-    return yaml.dump(
-        data, default_flow_style=False, allow_unicode=True, sort_keys=False
     )

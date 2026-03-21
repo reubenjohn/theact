@@ -15,6 +15,26 @@ class YAMLParseError(Exception):
     """Raised when the LLM response cannot be parsed as YAML."""
 
 
+async def call_llm(
+    client: AsyncOpenAI, config: CreatorLLMConfig, messages: list[dict]
+) -> str:
+    """Call the LLM and return the response text content."""
+    response = await client.chat.completions.create(
+        model=config.model,
+        messages=messages,
+        temperature=config.temperature,
+        max_tokens=config.max_tokens,
+    )
+    return response.choices[0].message.content or ""
+
+
+def serialize_game_data(data: dict) -> str:
+    """Serialize a game data dict to a YAML string for prompt injection."""
+    return yaml.dump(
+        data, default_flow_style=False, allow_unicode=True, sort_keys=False
+    )
+
+
 def _extract_yaml(response_text: str) -> dict:
     """Extract YAML from an LLM response, handling fenced or raw YAML.
 
@@ -110,22 +130,17 @@ async def generate_game_files(
         {"role": "user", "content": GENERATION_USER.format(proposal=proposal_yaml)},
     ]
 
+    MAX_ATTEMPTS = 3
     last_error: YAMLParseError | None = None
 
-    for attempt in range(3):
-        response = await client.chat.completions.create(
-            model=config.model,
-            messages=messages,
-            temperature=config.temperature,
-            max_tokens=config.max_tokens,
-        )
-        response_text = response.choices[0].message.content or ""
+    for attempt in range(MAX_ATTEMPTS):
+        response_text = await call_llm(client, config, messages)
 
         try:
             return _parse_generation_response(response_text)
         except YAMLParseError as e:
             last_error = e
-            if attempt < 2:
+            if attempt < MAX_ATTEMPTS - 1:
                 messages.append({"role": "assistant", "content": response_text})
                 messages.append(
                     {
