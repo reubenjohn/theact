@@ -57,10 +57,10 @@ class TurnDebugger:
         agents, memory agents, and game_state based on the narrator's
         responding_characters list.
 
-        Raises StopIteration if no pending agents remain.
+        Raises RuntimeError if no pending agents remain.
         """
         if not self._pending:
-            raise StopIteration("No pending agents")
+            raise RuntimeError("No pending agents")
 
         agent_name = self._pending.pop(0)
         result = await self._run_agent(agent_name)
@@ -192,8 +192,9 @@ class TurnDebugger:
 
         content_parts: list[str] = []
 
-        async def capture_token(token: str) -> None:
-            content_parts.append(token)
+        async def capture_token(token: str, is_thinking: bool = False) -> None:
+            if not is_thinking:
+                content_parts.append(token)
 
         t0 = time.monotonic()
         narrator_output = await run_narrator(
