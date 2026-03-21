@@ -151,6 +151,12 @@ class TestExtractYaml:
         result = extract_yaml(text)
         assert result == {"key": "value"}
 
+    def test_truncated_fence_fallback(self):
+        """Handle responses with opening fence but no closing fence."""
+        text = "```yaml\nkey: value\nanother: thing\n"
+        result = extract_yaml(text)
+        assert result == {"key": "value", "another": "thing"}
+
     def test_backward_compatible_alias(self):
         from theact.creator.generator import _extract_yaml
 

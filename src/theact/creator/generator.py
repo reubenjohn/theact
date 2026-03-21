@@ -48,8 +48,14 @@ def extract_yaml(response_text: str) -> dict:
     """
     cleaned = _strip_think_tags(response_text)
 
+    # Try to match a fully-fenced block first
     match = re.search(r"```(?:yaml)?\s*\n(.*?)```", cleaned, re.DOTALL)
-    yaml_text = match.group(1) if match else cleaned
+    if match:
+        yaml_text = match.group(1)
+    else:
+        # Fallback: handle truncated responses with opening fence but no closing
+        open_match = re.search(r"```(?:yaml)?\s*\n(.*)", cleaned, re.DOTALL)
+        yaml_text = open_match.group(1) if open_match else cleaned
 
     try:
         data = yaml.safe_load(yaml_text)
