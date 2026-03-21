@@ -1,0 +1,135 @@
+"""Tests for creator generator (YAML parsing)."""
+
+import pytest
+
+from theact.creator.generator import (
+    YAMLParseError,
+    _parse_generation_response,
+    _parse_proposal_response,
+)
+
+
+# --- Sample YAML for tests ---
+
+VALID_GENERATION_YAML = """\
+game:
+  id: test-game
+  title: Test Game
+  description: A test game.
+  characters:
+    - maya
+  chapters:
+    - 01-start
+
+world:
+  setting: A dark forest.
+  tone: Second person, present tense.
+  rules: Magic does not exist.
+
+characters:
+  maya:
+    name: Maya
+    role: Guide.
+    personality: Calm and focused.
+    secret: Knows the way out.
+    relationships: {}
+
+chapters:
+  01-start:
+    id: 01-start
+    title: The Start
+    summary: The beginning.
+    beats:
+      - Player enters the forest
+      - Meets Maya
+      - Discovers the path
+      - Reaches the clearing
+    completion: Player has reached the clearing.
+    characters:
+      - maya
+    next: null
+"""
+
+VALID_PROPOSAL_YAML = """\
+title: Test Game
+id: test-game
+setting: A dark forest.
+tone: Second person, present tense.
+rules: No magic.
+characters:
+  - stem: maya
+    name: Maya
+    role: Guide through the forest.
+chapters:
+  - id: 01-start
+    title: The Start
+    summary: Enter the forest.
+"""
+
+
+class TestParseGenerationResponse:
+    def test_fenced_yaml(self):
+        text = f"Here is the output:\n\n```yaml\n{VALID_GENERATION_YAML}```\n\nDone."
+        result = _parse_generation_response(text)
+        assert "game" in result
+        assert "world" in result
+        assert "characters" in result
+        assert "chapters" in result
+        assert result["game"]["id"] == "test-game"
+
+    def test_raw_yaml_no_fencing(self):
+        result = _parse_generation_response(VALID_GENERATION_YAML)
+        assert "game" in result
+        assert result["game"]["title"] == "Test Game"
+
+    def test_fenced_without_yaml_tag(self):
+        text = f"```\n{VALID_GENERATION_YAML}```"
+        result = _parse_generation_response(text)
+        assert "game" in result
+
+    def test_malformed_yaml_raises(self):
+        bad = "```yaml\n{invalid: [yaml: !!error\n```"
+        with pytest.raises(YAMLParseError, match="not valid YAML"):
+            _parse_generation_response(bad)
+
+    def test_non_dict_raises(self):
+        text = "- just\n- a\n- list\n"
+        with pytest.raises(YAMLParseError, match="Expected a YAML mapping"):
+            _parse_generation_response(text)
+
+    def test_missing_keys_raises(self):
+        text = "game:\n  id: test\nworld:\n  setting: here\n"
+        with pytest.raises(YAMLParseError, match="missing required top-level keys"):
+            _parse_generation_response(text)
+
+    def test_plain_string_raises(self):
+        with pytest.raises(YAMLParseError, match="Expected a YAML mapping"):
+            _parse_generation_response("just a string response without yaml")
+
+
+class TestParseProposalResponse:
+    def test_valid_proposal(self):
+        text = f"```yaml\n{VALID_PROPOSAL_YAML}```"
+        result = _parse_proposal_response(text)
+        assert result["title"] == "Test Game"
+        assert result["id"] == "test-game"
+        assert len(result["characters"]) == 1
+        assert len(result["chapters"]) == 1
+
+    def test_raw_proposal(self):
+        result = _parse_proposal_response(VALID_PROPOSAL_YAML)
+        assert result["title"] == "Test Game"
+
+    def test_missing_title_raises(self):
+        text = "id: test\ncharacters: []\nchapters: []\n"
+        with pytest.raises(YAMLParseError, match="missing required keys"):
+            _parse_proposal_response(text)
+
+    def test_missing_chapters_raises(self):
+        text = "title: X\nid: x\ncharacters: []\n"
+        with pytest.raises(YAMLParseError, match="missing required keys"):
+            _parse_proposal_response(text)
+
+    def test_malformed_yaml_raises(self):
+        with pytest.raises(YAMLParseError):
+            _parse_proposal_response("```yaml\n{bad: [yaml\n```")
