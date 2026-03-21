@@ -67,6 +67,39 @@ The completion condition is too strict or too vague. Fixes:
 - This is usually a game file issue, not a prompt issue. Loosen the `completion` field in the chapter YAML
 - If the game state agent is correctly identifying beats but not triggering completion, the completion condition may not match the beat set
 
+## Turn Debugger
+
+The fastest way to iterate on prompts is the turn debugger. See [Debugging Guide](debugging.md) for full details.
+
+Quick workflow:
+1. `uv run python scripts/debug_turn.py --save test --input "I look around."`
+2. Step to the failing agent
+3. Inspect the prompt and response
+4. Edit `src/theact/agents/prompts.py`
+5. Press `e` to reload and replay — no restart needed
+
+## Golden Scenarios
+
+After fixing a prompt, verify it doesn't break other behaviors:
+```bash
+uv run python scripts/run_golden.py
+```
+
+See [Golden Scenarios Guide](golden-scenarios.md) for writing new scenarios.
+
+## A/B Testing
+
+For larger prompt changes, compare variants statistically:
+```bash
+uv run python scripts/ab_test.py --variant-b prompts_v2.py --runs 3
+```
+
+See [A/B Testing Guide](ab-testing.md) for details.
+
+## Model Quirks
+
+Known 7B model behaviors are documented in `docs/model-quirks.yaml`. Check this file before debugging — your issue may already have a known workaround.
+
 ## Further Reading
 
 - [Agents](../design/agents.md) — what each agent does and how prompts are structured

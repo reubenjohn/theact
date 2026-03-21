@@ -53,6 +53,29 @@ The report ([`src/theact/playtest/report.py`](../../src/theact/playtest/report.p
 
 For all prompt-related fixes, see [Prompt Iteration](prompt-iteration.md).
 
+## Quality Scoring
+
+Each turn is scored on four dimensions:
+- **Narration length** (0.3 weight) — 150-300 words is ideal
+- **YAML first attempt** (0.2 weight) — parsed without retry
+- **Character personality** (0.3 weight) — response matches personality markers
+- **Memory relevance** (0.2 weight) — memory updates reference actual turn events
+
+The composite score (0.0-1.0) appears in the playtest report.
+
+## LLM Call Summary
+
+Playtest reports now include per-agent call statistics: total calls, mean latency, parse success rate, token breakdown, and retry counts. Look for the "LLM Call Summary" section.
+
+## Edge Case Injection
+
+The player agent can inject edge cases at configurable frequencies:
+- Direct string injection (5%): "ok", "yes", nonsense strings
+- Nonsensical inputs (3%): random characters, repeated text
+- Repeat injection (3%): same action as previous turn
+
+Configure via `PlaytestConfig` fields: `direct_edge_case_frequency`, `nonsense_frequency`, `repeat_frequency`.
+
 ## Further Reading
 
 - [Prompt Iteration](prompt-iteration.md) — the fix workflow for playtest failures

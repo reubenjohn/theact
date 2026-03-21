@@ -25,21 +25,41 @@ Player Input → Context Assembly (code) → Narrator Agent (streaming)
 Code layout:
 - `src/theact/models/` — Pydantic data models
 - `src/theact/io/` — YAML I/O, save manager
-- `src/theact/versioning/` — Git-based save versioning
-- `src/theact/llm/` — LLM client, streaming, structured output parsing
-- `src/theact/engine/` — Turn engine, context assembly
+- `src/theact/versioning/` — Git-based save versioning (`save_as`, `peek_at_turn`, `diff_turns`)
+- `src/theact/llm/` — LLM client, streaming, structured output, call logging, profiler
+- `src/theact/engine/` — Turn engine, context assembly, diagnostics writer
 - `src/theact/agents/` — Narrator, character, memory, game state, summarizer agents
+- `src/theact/debugger/` — Interactive turn debugger for prompt engineering
 - `src/theact/cli/` — Rich terminal CLI
-- `src/theact/playtest/` — Autonomous playtest framework
+- `src/theact/playtest/` — Autonomous playtest framework with quality scoring
 - `src/theact/creator/` — Game creation agent
 - `src/theact/web/` — NiceGUI web interface
 
 ## Documentation
 
-- `docs/README.md` — Documentation hub (start here for navigation)
-- `docs/design/` — Architecture, agents, data model, memory & summarization
-- `docs/guides/` — Getting started, creating games, playtesting, prompt iteration
+- `docs/README.md` — **Start here.** Navigation hub for all documentation.
+- `docs/design/` — Architecture, agents, data model, memory, observability, debugger
+- `docs/guides/` — How-to guides for gameplay, development, testing, and debugging
 - `docs/requirements.md` — Design rationale — the "why" behind decisions
+- `docs/model-quirks.yaml` — Observed 7B model behaviors and workarounds
+
+## Observability & Debugging Tools
+
+These tools exist for diagnosing and improving model behavior. See `docs/guides/` for details.
+
+- **Call logging** — Every LLM call records tokens, latency, parse result. See `src/theact/llm/call_log.py`.
+- **Diagnostics writer** — `run_turn(..., debug=True)` writes per-agent artifacts (prompts, responses, parsed output) to `diagnostics/turn-NNN/`.
+- **Context profiler** — `src/theact/llm/profiler.py` — analyze token budget allocation per agent.
+- **Turn debugger** — `scripts/debug_turn.py` — step through agents interactively, replay with edited prompts, capture fixtures. See `docs/guides/debugging.md`.
+- **Error taxonomy** — 7-category `ParseFailureType` in `src/theact/llm/errors.py` classifies why YAML parsing failed.
+- **Prompt linting** — `tests/test_prompt_lint.py` enforces ≤300 token budgets and no orphan placeholders.
+
+## Testing & Validation Tools
+
+- **Playtest framework** — `scripts/playtest.py` — autonomous N-turn playtests with quality scoring and LLM call reports.
+- **Golden scenarios** — `scripts/run_golden.py` — behavioral test scenarios with structural assertions (not textual). See `tests/golden_scenarios/`.
+- **A/B testing** — `scripts/ab_test.py` — compare two prompt variants with statistical metrics.
+- **Agent diagnostics** — `scripts/diagnose_agent.py` — test individual agents against the live API.
 
 ## Implementation Plans
 
@@ -52,6 +72,9 @@ Detailed phase-by-phase plans are in `docs/plans/`. Read them in order:
 6. `06-GameCreationAgent.md` — Interactive game creation (uses larger model)
 7. `07-WebUI.md` — NiceGUI web interface
 8. `08-Documentation.md` — Guides and design docs
+9. `09-ObservabilityAndDiagnostics.md` — Call logging, diagnostics, profiler, error taxonomy
+10. `10-SaveVersioningAndTurnDebugger.md` — Save forking, history peek/diff, interactive debugger
+11. `11-SmallModelHardening.md` — Prompt iteration, YAML reliability, golden scenarios
 
 ## Commands
 
@@ -59,10 +82,16 @@ Detailed phase-by-phase plans are in `docs/plans/`. Read them in order:
 uv sync                              # Install dependencies
 uv run pytest tests/                 # Run tests (unit only)
 uv run pytest tests/web/             # Run web UI browser tests (requires Chromium)
-uv run python scripts/test_llm.py    # Smoke test LLM client (needs VENICE_API_KEY)
-uv run python scripts/playtest.py --game lost-island --turns 20  # Autonomous playtest
-uv run python -m theact              # Launch CLI (Phase 04)
+uv run python -m theact              # Launch CLI
 uv run python -m theact.web          # Launch Web UI (port 8080)
+
+# LLM testing (requires VENICE_API_KEY in .env)
+uv run python scripts/test_llm.py                              # Smoke test LLM client
+uv run python scripts/diagnose_agent.py narrator "I look around"  # Test one agent
+uv run python scripts/playtest.py --game lost-island --turns 20   # Autonomous playtest
+uv run python scripts/debug_turn.py --save test --input "I look around"  # Turn debugger
+uv run python scripts/run_golden.py                              # Golden scenario suite
+uv run python scripts/ab_test.py --variant-b prompts_v2.py --runs 3  # A/B test
 ```
 
 ## Playwright MCP (Browser Testing)
