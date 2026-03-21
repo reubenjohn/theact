@@ -55,27 +55,24 @@ markdown_extensions:
       permalink: true
 
 nav:
-  - Home: index.md
+  - Home: README.md
+  - Core Concepts: concepts.md
+  - Getting Started: getting-started.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Data Model: architecture/data-model.md
+    - Agents: architecture/agents.md
+    - Memory & Summarization: architecture/memory.md
+    - Save Versioning: architecture/save-versioning.md
   - Guides:
-    - Getting Started: guides/getting-started.md
     - Creating a Game: guides/creating-a-game.md
     - Playtesting: guides/playtesting.md
-    - Prompt Iteration: guides/prompt-iteration.md
-  - Debugging & Testing:
     - Debugging: guides/debugging.md
-    - Diagnostics: guides/diagnostics.md
-    - Golden Scenarios: guides/golden-scenarios.md
-    - A/B Testing: guides/ab-testing.md
-  - Architecture:
-    - Overview: design/architecture.md
-    - Agents: design/agents.md
-    - Data Model: design/data-model.md
-    - Memory & Summarization: design/memory-and-summarization.md
-    - Observability: design/observability.md
-    - Creator Agent: design/creator.md
-    - Turn Debugger: design/debugger.md
+    - Prompt Engineering: guides/prompt-engineering.md
   - Reference:
-    - Requirements & Rationale: requirements.md
+    - Observability: reference/observability.md
+    - Game Creation Pipeline: reference/game-creation-pipeline.md
+    - Requirements & Rationale: reference/requirements.md
   - Plans:
     - Overview: plans/README.md
     - Phase 01 - Data Model: plans/01-DataModelAndProjectStructure.md
@@ -89,4 +86,3 @@ nav:
     - Phase 09 - Observability: plans/09-ObservabilityAndDiagnostics.md
     - Phase 10 - Save Versioning: plans/10-SaveVersioningAndTurnDebugger.md
     - Phase 11 - Small Model Hardening: plans/11-SmallModelHardening.md
-  - Contributing: https://github.com/reubenjohn/theact/blob/main/CONTRIBUTING.md
