@@ -1,8 +1,13 @@
-"""Gameplay view: chat display, streaming, input handling, commands.
+"""Gameplay session — thin orchestrator.
 
-This module creates the gameplay interface and manages a single
-play session. It uses the same turn engine as the CLI (run_turn()
-with a StreamCallback).
+Delegates to:
+  - TurnRunner for turn execution
+  - StreamRenderer for token routing
+  - CommandRouter for slash commands
+  - GameSessionState for shared state
+
+Owns the UI layout (header, chat area, input bar) and the main
+input loop (_on_submit). Everything else is delegated.
 """
 
 from __future__ import annotations
@@ -13,54 +18,42 @@ from collections import defaultdict
 from nicegui import ui
 
 from theact.cli.commands import parse_command
-from theact.engine.turn import run_turn
-from theact.io.save_manager import load_save
-from theact.llm.config import LLMConfig
-from theact.models.game import LoadedGame
-from theact.web.commands import (
-    cmd_conversation_web,
-    cmd_help_web,
-    cmd_history_web,
-    cmd_memory_web,
-    cmd_save_as_web,
-    cmd_save_web,
-    cmd_status_web,
-    cmd_undo_web,
-)
-from theact.web.components import (
-    create_character_block,
-    create_narrator_block,
-    create_player_block,
-    create_thinking_panel,
-    create_turn_card,
-    render_static_turn,
-)
+from theact.web.command_router import CommandRouter
+from theact.web.components.message_blocks import create_player_block
+from theact.web.components.static_turn import render_static_turn
+from theact.web.components.turn_card import create_turn_card
+from theact.web.state import GameSessionState
+from theact.web.streaming import StreamRenderer
+from theact.web.turn_runner import TurnRunner
 
 logger = logging.getLogger(__name__)
 
 
 class GameplaySession:
-    """Manages the web gameplay view for a single loaded game.
+    """Thin orchestrator for the gameplay view.
 
-    Responsible for:
-    - Rendering conversation history on load
-    - Handling player input and slash commands
-    - Streaming turn output to the UI
-    - Input locking during turn processing
+    Accepts either:
+      - state: GameSessionState (new API)
+      - game + llm_config (legacy API, creates GameSessionState internally)
     """
 
     def __init__(
         self,
-        game: LoadedGame,
-        llm_config: LLMConfig,
-        on_quit: callable,
+        state: GameSessionState | None = None,
+        on_quit: callable = None,
+        # Legacy parameters — kept for backward compat with app.py
+        game=None,
+        llm_config=None,
     ) -> None:
-        self.game = game
-        self.llm_config = llm_config
-        self.on_quit = on_quit
-        self.show_thinking = True
-        self._last_player_input: str | None = None
-        self._processing = False
+        if state is not None:
+            self._state = state
+        else:
+            # Legacy path: construct state from separate args
+            self._state = GameSessionState(game=game, llm_config=llm_config)
+
+        self._on_quit = on_quit
+        self._turn_runner = TurnRunner(self._state)
+        self._command_router: CommandRouter | None = None
 
         # UI references (set during build)
         self._chat_scroll: ui.scroll_area | None = None
@@ -71,10 +64,27 @@ class GameplaySession:
         self._think_switch: ui.switch | None = None
         self._gameplay_container: ui.column | None = None
 
+    # --- Public properties for backward compat ---
+
+    @property
+    def game(self):
+        return self._state.game
+
+    @game.setter
+    def game(self, value):
+        self._state.game = value
+
+    @property
+    def show_thinking(self):
+        return self._state.show_thinking
+
+    @show_thinking.setter
+    def show_thinking(self, value):
+        self._state.show_thinking = value
+
     @property
     def character_list(self) -> list[str]:
-        """Ordered list of character stems for color assignment."""
-        return list(self.game.characters.keys())
+        return self._state.character_list
 
     def build(self, container: ui.element) -> None:
         """Build the gameplay UI inside the given container."""
@@ -86,10 +96,8 @@ class GameplaySession:
             )
 
             with self._gameplay_container:
-                # --- Header bar ---
                 self._build_header()
 
-                # --- Chat area ---
                 self._chat_scroll = (
                     ui.scroll_area()
                     .classes("w-full flex-grow")
@@ -99,10 +107,9 @@ class GameplaySession:
                 with self._chat_scroll:
                     self._chat_area = ui.column().classes("w-full gap-2 p-2")
 
-                # --- Input bar ---
                 self._build_input_bar()
 
-        # Render conversation history
+        self._command_router = CommandRouter(self._state, self._chat_area)
         self._render_history()
 
     def _build_header(self) -> None:
@@ -115,16 +122,17 @@ class GameplaySession:
             chapter_title = self._current_chapter_title()
             self._header_label = (
                 ui.label(
-                    f"{self.game.meta.title} -- Turn {self.game.state.turn} -- "
+                    f"{self._state.game.meta.title} -- "
+                    f"Turn {self._state.game.state.turn} -- "
                     f"{chapter_title}"
                 )
                 .style("color: #ccc; font-size: 0.9em;")
                 .classes("flex-grow")
             )
 
-            self._think_switch = ui.switch("Thinking", value=self.show_thinking).style(
-                "color: #999;"
-            )
+            self._think_switch = ui.switch(
+                "Thinking", value=self._state.show_thinking
+            ).style("color: #999;")
             self._think_switch.on_value_change(self._on_think_toggle)
 
             ui.button("Menu", on_click=self._handle_quit, icon="home").props(
@@ -150,12 +158,11 @@ class GameplaySession:
 
     def _render_history(self) -> None:
         """Render existing conversation history as static turn cards."""
-        if not self.game.conversation:
+        if not self._state.game.conversation:
             return
 
-        # Group entries by turn number
         turns: dict[int, list] = defaultdict(list)
-        for entry in self.game.conversation:
+        for entry in self._state.game.conversation:
             turns[entry.turn].append(entry)
 
         for turn_num in sorted(turns.keys()):
@@ -166,17 +173,16 @@ class GameplaySession:
                 turn_num,
                 chapter_title,
                 entries,
-                self.game.state.player_name,
-                self.character_list,
+                self._state.game.state.player_name,
+                self._state.character_list,
             )
 
-        # Scroll to bottom after rendering history
         if self._chat_scroll:
             self._chat_scroll.scroll_to(percent=1.0)
 
     async def _on_submit(self) -> None:
-        """Handle input submission (Enter key or Send button)."""
-        if self._processing:
+        """Handle input submission — route to command or turn."""
+        if self._state.processing:
             return
 
         text = self._input_field.value.strip() if self._input_field.value else ""
@@ -185,62 +191,58 @@ class GameplaySession:
         if not text:
             return
 
-        # Check for slash command
         command = parse_command(text)
         if command:
             cmd_name, args = command
             await self._execute_command(cmd_name, args)
             return
 
-        # Normal player input
         await self._play_turn(text)
 
-    async def _play_turn(self, player_input: str) -> None:
-        """Run a turn through the engine, streaming results to the UI."""
-        self._last_player_input = player_input
-        self._lock_input()
-
-        chapter_title = self._current_chapter_title()
-        turn_card = create_turn_card(
-            self._chat_area, self.game.state.turn + 1, chapter_title
-        )
-
-        thinking_block = create_thinking_panel(turn_card)
-
-        # Track streaming state
-        current_block: list = [None]  # mutable reference
-        current_section: list = ["idle"]
-
-        async def on_token(
-            source: str, character: str | None, token: str, is_thinking: bool
-        ) -> None:
-            """Stream callback: route tokens to UI components."""
-            if is_thinking:
-                if self.show_thinking:
-                    thinking_block.append_text(token)
-                return
-
-            if source == "narrator":
-                if current_section[0] != "narrator":
-                    current_section[0] = "narrator"
-                    current_block[0] = create_narrator_block(turn_card)
-                current_block[0].append_text(token)
-            elif source == "character":
-                char_name = character or "?"
-                section_key = f"character:{char_name}"
-                if current_section[0] != section_key:
-                    current_section[0] = section_key
-                    current_block[0] = create_character_block(
-                        turn_card, char_name, self.character_list
-                    )
-                current_block[0].append_text(token)
-
-            # Auto-scroll on each token
+    async def _execute_command(self, cmd: str, args: list[str]) -> None:
+        """Execute a slash command."""
+        if cmd == "quit":
+            self._handle_quit()
+            return
+        if cmd == "think":
+            self._handle_think(args)
             if self._chat_scroll:
                 self._chat_scroll.scroll_to(percent=1.0)
+            return
+        if cmd == "retry":
+            await self._handle_retry()
+            return
+
+        result = self._command_router.execute(cmd, args)
+
+        # For undo, re-render the conversation
+        if cmd == "undo" and result and result.success:
+            self._chat_area.clear()
+            self._render_history()
+            self._update_header()
+
+        if self._chat_scroll:
+            self._chat_scroll.scroll_to(percent=1.0)
+
+    async def _play_turn(self, player_input: str) -> None:
+        """Execute a turn with streaming."""
+        self._state.last_player_input = player_input
+        self._lock_input()
+
+        turn_card = create_turn_card(
+            self._chat_area,
+            self._state.game.state.turn + 1,
+            self._current_chapter_title(),
+        )
+
+        renderer = StreamRenderer(
+            turn_card=turn_card,
+            show_thinking=self._state.show_thinking,
+            character_list=self._state.character_list,
+            chat_scroll=self._chat_scroll,
+        )
 
         try:
-            # Create a spinner row (hidden until post-processing starts)
             with turn_card:
                 spinner_row = ui.row().classes("items-center gap-2")
                 with spinner_row:
@@ -248,19 +250,16 @@ class GameplaySession:
                     ui.label("processing...").style("color: #888; font-size: 0.8em;")
                 spinner_row.set_visibility(False)
 
-            result = await run_turn(
-                self.game,
-                player_input,
-                self.llm_config,
-                on_token=on_token,
+            result = await self._turn_runner.run(
+                player_input=player_input,
+                on_token=renderer.route_token,
             )
 
-            # Finish any active streaming block
-            if current_block[0]:
-                current_block[0].finish()
+            renderer.finish()
 
-            # Add player message to the turn card
-            create_player_block(turn_card, self.game.state.player_name, player_input)
+            create_player_block(
+                turn_card, self._state.game.state.player_name, player_input
+            )
 
             # Show turn summary info
             with turn_card:
@@ -270,7 +269,7 @@ class GameplaySession:
                 if result.narrator.responding_characters:
                     char_names = []
                     for cid in result.narrator.responding_characters:
-                        c = self.game.characters.get(cid)
+                        c = self._state.game.characters.get(cid)
                         char_names.append(c.name if c else cid)
                     info_parts.append(f"Characters: {', '.join(char_names)}")
                 if result.game_state and result.game_state.beats_hit:
@@ -284,114 +283,65 @@ class GameplaySession:
                         "color: #666; font-size: 0.75em; margin-top: 8px;"
                     )
 
-            # Reload game from disk
-            self._reload_game()
+            self._state.reload_game()
             self._update_header()
 
         except Exception as e:
             logger.exception("Error during turn")
+            renderer.finish()
             with turn_card:
                 ui.label(f"Error: {e}").style("color: #ff5252; margin-top: 8px;")
-            # Reload from disk to discard partial mutations
-            self._reload_game()
+            try:
+                self._state.reload_game()
+            except Exception:
+                logger.exception("Failed to reload game from disk")
 
         finally:
-            # Remove spinner
             spinner_row.set_visibility(False)
             self._unlock_input()
-
-            # Auto-scroll to bottom
             if self._chat_scroll:
                 self._chat_scroll.scroll_to(percent=1.0)
 
-    async def _execute_command(self, cmd: str, args: list[str]) -> None:
-        """Execute a slash command and render output to the chat area."""
-        if cmd == "help":
-            cmd_help_web(self._chat_area)
-        elif cmd == "quit":
-            self._handle_quit()
-        elif cmd == "undo":
-            await self._cmd_undo(args)
-        elif cmd == "history":
-            cmd_history_web(self._chat_area, self.game)
-        elif cmd == "save":
-            cmd_save_web(self._chat_area, self.game)
-        elif cmd == "status":
-            cmd_status_web(self._chat_area, self.game)
-        elif cmd == "memory":
-            cmd_memory_web(self._chat_area, self.game, args)
-        elif cmd == "think":
-            self._cmd_think(args)
-        elif cmd == "retry":
-            await self._cmd_retry()
-        elif cmd == "conversation":
-            cmd_conversation_web(self._chat_area, self.game, args)
-        elif cmd == "save-as":
-            cmd_save_as_web(self.game, args)
-        else:
-            ui.notify(
-                f"Unknown command: /{cmd}. Type /help for available commands.",
-                type="warning",
-            )
-
-        # Scroll to bottom after command output
-        if self._chat_scroll:
-            self._chat_scroll.scroll_to(percent=1.0)
-
-    async def _cmd_undo(self, args: list[str]) -> None:
-        """Handle /undo command: rewind and re-render conversation."""
-        reloaded, message = cmd_undo_web(self.game, args)
-        if reloaded is None:
-            ui.notify(message, type="warning")
-            return
-
-        self.game = reloaded
-        ui.notify(message, type="info")
-
-        # Clear and re-render conversation
-        self._chat_area.clear()
-        self._render_history()
-        self._update_header()
-
-    def _cmd_think(self, args: list[str]) -> None:
+    def _handle_think(self, args: list[str]) -> None:
         """Handle /think command."""
         if not args:
-            state = "on" if self.show_thinking else "off"
+            state = "on" if self._state.show_thinking else "off"
             ui.notify(f"Thinking display is {state}.", type="info")
             return
 
         arg = args[0].lower()
         if arg == "on":
-            self.show_thinking = True
+            self._state.show_thinking = True
             if self._think_switch:
                 self._think_switch.value = True
             ui.notify("Thinking display enabled.", type="info")
         elif arg == "off":
-            self.show_thinking = False
+            self._state.show_thinking = False
             if self._think_switch:
                 self._think_switch.value = False
             ui.notify("Thinking display disabled.", type="info")
         else:
             ui.notify("Usage: /think [on|off]", type="warning")
 
-    async def _cmd_retry(self) -> None:
+    async def _handle_retry(self) -> None:
         """Undo last turn and replay the same player input."""
-        if self._last_player_input is None:
+        if not self._state.last_player_input:
             ui.notify("No previous input to retry.", type="warning")
             return
 
-        previous_input = self._last_player_input
+        previous_input = self._state.last_player_input
 
-        # Undo last turn
-        reloaded, message = cmd_undo_web(self.game, [])
-        if reloaded is None:
-            ui.notify(message, type="warning")
+        from theact.commands.logic import cmd_undo
+
+        result = cmd_undo(self._state.game, [])
+        if not result.success:
+            ui.notify(result.message, type="warning")
             return
 
-        self.game = reloaded
+        if result.data:
+            self._state.game = result.data
         ui.notify(f"Retrying: {previous_input}", type="info")
 
-        # Clear and re-render, then replay
         self._chat_area.clear()
         self._render_history()
         self._update_header()
@@ -400,16 +350,16 @@ class GameplaySession:
 
     def _on_think_toggle(self, e) -> None:
         """Handle the thinking toggle switch."""
-        self.show_thinking = e.value
+        self._state.show_thinking = e.value
 
     def _handle_quit(self) -> None:
         """Return to the main menu."""
-        if self.on_quit:
-            self.on_quit()
+        if self._on_quit:
+            self._on_quit()
 
     def _lock_input(self) -> None:
         """Disable input during turn processing."""
-        self._processing = True
+        self._state.processing = True
         if self._input_field:
             self._input_field.disable()
         if self._send_button:
@@ -417,7 +367,7 @@ class GameplaySession:
 
     def _unlock_input(self) -> None:
         """Re-enable input after turn processing."""
-        self._processing = False
+        self._state.processing = False
         if self._input_field:
             self._input_field.enable()
             self._input_field.run_method("focus")
@@ -426,8 +376,8 @@ class GameplaySession:
 
     def _current_chapter_title(self) -> str:
         """Get the current chapter's display title."""
-        chapter_id = self.game.state.current_chapter
-        chapter = self.game.chapters.get(chapter_id)
+        chapter_id = self._state.game.state.current_chapter
+        chapter = self._state.game.chapters.get(chapter_id)
         return chapter.title if chapter else chapter_id
 
     def _update_header(self) -> None:
@@ -435,18 +385,12 @@ class GameplaySession:
         if self._header_label:
             chapter_title = self._current_chapter_title()
             self._header_label.text = (
-                f"{self.game.meta.title} -- Turn {self.game.state.turn} -- "
+                f"{self._state.game.meta.title} -- "
+                f"Turn {self._state.game.state.turn} -- "
                 f"{chapter_title}"
             )
 
-    def _reload_game(self) -> None:
-        """Reload game from disk, discarding in-memory state."""
-        try:
-            self.game = load_save(self.game.save_path.name, self.game.save_path.parent)
-        except Exception:
-            logger.exception("Failed to reload game from disk")
-
     async def auto_start(self) -> None:
         """If this is a fresh game (turn 0), auto-play the opening."""
-        if self.game.state.turn == 0:
+        if self._state.game.state.turn == 0:
             await self._play_turn("[game start]")
