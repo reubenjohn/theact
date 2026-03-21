@@ -2,7 +2,7 @@
 
 ## Overview
 
-TheAct is built in 7 sequential phases. Each plan document is self-contained with data models, code signatures, implementation steps, and verification criteria.
+TheAct is built in sequential phases. Each plan document is self-contained with data models, code signatures, implementation steps, and verification criteria.
 
 **Read order:** CLAUDE.md → docs/requirements.md → the specific phase plan.
 
@@ -17,6 +17,8 @@ TheAct is built in 7 sequential phases. Each plan document is self-contained wit
 | 05 | [05-ExampleGameAndPlaytest.md](05-ExampleGameAndPlaytest.md) | Lost Island game files, autonomous playtest framework | 01–04 |
 | 06 | [06-GameCreationAgent.md](06-GameCreationAgent.md) | Interactive game creation with a larger model | 01, 04 |
 | 07 | [07-WebUI.md](07-WebUI.md) | NiceGUI browser interface | 01–03 |
+| 08 | [08-Documentation.md](08-Documentation.md) | Guides, design docs, documentation hub | All |
+| 09 | [09-SmallModelHardening.md](09-SmallModelHardening.md) | Prompt hardening, YAML reliability, token budgets, regression tests | 01–05 |
 
 ## Cross-Cutting Implementation Notes
 
@@ -157,4 +159,20 @@ so CLI-only users aren't affected:
   [project.optional-dependencies]
   web = ["nicegui>=2.0"]
 The web UI must use the same turn engine interface as the CLI. No engine changes.
+```
+
+**Phase 09** — append:
+```
+This phase is iterative. Each step modifies prompts or parsing code, then
+validates against the live model. You MUST have VENICE_API_KEY in .env.
+
+After each prompt change:
+  1. Run scripts/diagnose_agent.py for the affected agent (3+ times)
+  2. Verify the fix works, then capture a fixture with --save-fixture
+  3. Write a regression test from the fixture
+  4. Run uv run pytest tests/ -v to ensure no regressions
+
+After all steps:
+  uv run python scripts/playtest.py --game lost-island --turns 20
+Review the report against the success criteria in Section 11 of the plan.
 ```

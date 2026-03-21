@@ -34,6 +34,13 @@ Code layout:
 - `src/theact/creator/` — Game creation agent
 - `src/theact/web/` — NiceGUI web interface
 
+## Documentation
+
+- `docs/README.md` — Documentation hub (start here for navigation)
+- `docs/design/` — Architecture, agents, data model, memory & summarization
+- `docs/guides/` — Getting started, creating games, playtesting, prompt iteration
+- `docs/requirements.md` — Design rationale — the "why" behind decisions
+
 ## Implementation Plans
 
 Detailed phase-by-phase plans are in `docs/plans/`. Read them in order:
@@ -44,8 +51,7 @@ Detailed phase-by-phase plans are in `docs/plans/`. Read them in order:
 5. `05-ExampleGameAndPlaytest.md` — Lost Island game + autonomous playtest framework
 6. `06-GameCreationAgent.md` — Interactive game creation (uses larger model)
 7. `07-WebUI.md` — NiceGUI web interface
-
-A requirements document at `docs/requirements.md` explains the reasoning behind key decisions.
+8. `08-Documentation.md` — Guides and design docs
 
 ## Commands
 

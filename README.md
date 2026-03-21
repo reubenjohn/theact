@@ -55,9 +55,11 @@ docs/plans/     # Detailed implementation plans
 
 ## Documentation
 
-- [Requirements & Design Rationale](docs/requirements.md) — Why decisions were made
-- [Phase Plans](docs/plans/) — Detailed implementation plans (01 through 07)
-- [CLAUDE.md](CLAUDE.md) — Context for AI-assisted development
+Start at [docs/README.md](docs/README.md) for the full index. Key entry points:
+
+- **Guides:** [Getting Started](docs/guides/getting-started.md) | [Creating a Game](docs/guides/creating-a-game.md) | [Playtesting](docs/guides/playtesting.md) | [Prompt Iteration](docs/guides/prompt-iteration.md)
+- **Design:** [Architecture](docs/design/architecture.md) | [Agents](docs/design/agents.md) | [Data Model](docs/design/data-model.md) | [Memory & Summarization](docs/design/memory-and-summarization.md)
+- **Reference:** [Requirements & Rationale](docs/requirements.md) | [Phase Plans](docs/plans/) | [CLAUDE.md](CLAUDE.md)
 
 ## Tech Stack
 
