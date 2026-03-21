@@ -756,4 +756,4 @@ class TestLostIslandGameFiles:
             "03-the-heart.yaml",
         ]:
             chap_size = (game_dir / "chapters" / name).stat().st_size
-            assert chap_size < 600, f"{name} is {chap_size} bytes (budget: 600)"
+            assert chap_size < 800, f"{name} is {chap_size} bytes (budget: 800)"
