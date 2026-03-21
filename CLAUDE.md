@@ -119,6 +119,7 @@ Requires a `.env` file (already configured in the project root):
 VENICE_API_KEY=<set>
 VENICE_BASE_URL=https://api.venice.ai/api/v1     # optional
 VENICE_MODEL=olafangensan-glm-4.7-flash-heretic   # optional
+THEACT_DATA_DIR=/path/to/data                     # optional — contains games/ and saves/
 ```
 
 The API key is available for live model testing, diagnostics, and playtest runs.

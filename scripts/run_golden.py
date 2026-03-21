@@ -24,12 +24,10 @@ from dotenv import load_dotenv
 
 from theact.engine.turn import run_turn
 from theact.engine.types import TurnResult
-from theact.io.save_manager import create_save, load_save
+from theact.io.save_manager import GAMES_DIR, SAVES_DIR, create_save, load_save
 from theact.llm.config import load_llm_config
 
 SCENARIOS_DIR = Path(__file__).parent.parent / "tests" / "golden_scenarios"
-GAMES_DIR = Path(__file__).parent.parent / "games"
-SAVES_DIR = Path(__file__).parent.parent / "saves"
 
 
 def load_scenario(path: Path) -> dict:

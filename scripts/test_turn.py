@@ -8,17 +8,14 @@ Runs 3 turns against the live API with the lost-island game.
 
 import asyncio
 import shutil
-from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from theact.engine.turn import run_turn  # noqa: E402
-from theact.io.save_manager import create_save, load_save  # noqa: E402
+from theact.io.save_manager import SAVES_DIR, create_save, load_save  # noqa: E402
 from theact.llm.config import load_llm_config  # noqa: E402
-
-SAVES_DIR = Path("saves")
 
 
 async def on_token(source: str, character: str | None, token: str) -> None:

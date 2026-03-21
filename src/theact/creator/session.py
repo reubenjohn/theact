@@ -111,7 +111,9 @@ async def create_game() -> Path | None:
 
     # Step 7: Write to disk
     game_id = result.game.id
-    game_dir = Path("games") / game_id
+    from theact.io.save_manager import GAMES_DIR
+
+    game_dir = GAMES_DIR / game_id
     if game_dir.exists():
         confirm = _get_input(
             f"Game directory '{game_dir}' already exists. Overwrite? (y/n): "
