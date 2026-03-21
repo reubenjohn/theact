@@ -18,7 +18,9 @@ TheAct is built in sequential phases. Each plan document is self-contained with 
 | 06 | [06-GameCreationAgent.md](06-GameCreationAgent.md) | Interactive game creation with a larger model | 01, 04 |
 | 07 | [07-WebUI.md](07-WebUI.md) | NiceGUI browser interface | 01–03 |
 | 08 | [08-Documentation.md](08-Documentation.md) | Guides, design docs, documentation hub | All |
-| 09 | [09-SmallModelHardening.md](09-SmallModelHardening.md) | Prompt hardening, YAML reliability, token budgets, regression tests | 01–05 |
+| 09 | [09-ObservabilityAndDiagnostics.md](09-ObservabilityAndDiagnostics.md) | LLM call logging, diagnostics filesystem, prompt linting, error taxonomy | 01–05 |
+| 10 | [10-SaveVersioningAndTurnDebugger.md](10-SaveVersioningAndTurnDebugger.md) | Save-as/fork, peek, diff, interactive turn debugger | 01, 03, 09 |
+| 11 | [11-SmallModelHardening.md](11-SmallModelHardening.md) | Prompt iteration, YAML reliability, token budgets, golden scenarios | 09, 10 |
 
 ## Cross-Cutting Implementation Notes
 
@@ -163,16 +165,31 @@ The web UI must use the same turn engine interface as the CLI. No engine changes
 
 **Phase 09** — append:
 ```
+This phase is passive instrumentation — no prompt changes, no new features.
+All new parameters (call_log, debug, turn) must be optional with defaults
+so existing callers are unaffected. Run the full test suite after each step.
+```
+
+**Phase 10** — append:
+```
+Part A (save versioning) is independent infrastructure. Part B (turn debugger)
+uses Phase 09's LLMCallLog if available but degrades gracefully without it.
+The debugger wraps individual agent calls — it does NOT modify run_turn().
+When implementing edit_and_replay, reload BOTH prompts.py AND context.py.
+```
+
+**Phase 11** — append:
+```
 This phase is iterative. Each step modifies prompts or parsing code, then
 validates against the live model. You MUST have VENICE_API_KEY in .env.
 
 After each prompt change:
-  1. Run scripts/diagnose_agent.py for the affected agent (3+ times)
-  2. Verify the fix works, then capture a fixture with --save-fixture
+  1. Use the turn debugger to replay the affected agent (3+ times)
+  2. Verify the fix works, then capture a fixture with the debugger
   3. Write a regression test from the fixture
   4. Run uv run pytest tests/ -v to ensure no regressions
 
 After all steps:
   uv run python scripts/playtest.py --game lost-island --turns 20
-Review the report against the success criteria in Section 11 of the plan.
+Review the report against the success criteria in Section 17 of the plan.
 ```
