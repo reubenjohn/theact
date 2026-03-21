@@ -21,7 +21,7 @@ class TestLLMConfig:
         assert config.api_key == ""
         assert config.model == "olafangensan-glm-4.7-flash-heretic"
         assert config.default_temperature == 1.0
-        assert config.default_max_tokens == 900
+        assert config.default_max_tokens == 1500
         assert config.context_limit == 8192
 
     def test_frozen(self):
@@ -60,28 +60,28 @@ class TestAgentLLMConfig:
 class TestAgentDefaults:
     def test_narrator_config(self):
         assert NARRATOR_CONFIG.temperature == 1.0
-        assert NARRATOR_CONFIG.max_tokens == 600
+        assert NARRATOR_CONFIG.max_tokens == 2000
         assert NARRATOR_CONFIG.structured is True
         assert NARRATOR_CONFIG.max_retries == 2
 
     def test_character_config(self):
         assert CHARACTER_CONFIG.temperature == 1.0
-        assert CHARACTER_CONFIG.max_tokens == 400
+        assert CHARACTER_CONFIG.max_tokens == 1500
         assert CHARACTER_CONFIG.structured is False
 
     def test_memory_update_config(self):
         assert MEMORY_UPDATE_CONFIG.temperature == 0.3
-        assert MEMORY_UPDATE_CONFIG.max_tokens == 500
+        assert MEMORY_UPDATE_CONFIG.max_tokens == 1500
         assert MEMORY_UPDATE_CONFIG.structured is True
 
     def test_game_state_config(self):
         assert GAME_STATE_CONFIG.temperature == 0.2
-        assert GAME_STATE_CONFIG.max_tokens == 200
+        assert GAME_STATE_CONFIG.max_tokens == 1000
         assert GAME_STATE_CONFIG.structured is True
 
     def test_summarizer_config(self):
         assert SUMMARIZER_CONFIG.temperature == 0.3
-        assert SUMMARIZER_CONFIG.max_tokens == 300
+        assert SUMMARIZER_CONFIG.max_tokens == 1000
         assert SUMMARIZER_CONFIG.structured is False
 
 
