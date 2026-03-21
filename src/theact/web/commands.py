@@ -10,14 +10,10 @@ import html as html_lib
 
 from nicegui import ui
 
-from theact.cli.commands import parse_command
 from theact.io.save_manager import load_save
 from theact.models.game import LoadedGame
 from theact.versioning import git_save
 from theact.web.components import show_system_message
-
-# Re-export for convenience.
-__all__ = ["parse_command"]
 
 # Help text for web display.
 COMMANDS_HELP = """

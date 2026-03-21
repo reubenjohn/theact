@@ -13,6 +13,7 @@ from nicegui import ui
 from theact.web.styles import (
     NARRATOR_COLOR,
     NARRATOR_NAME_COLOR,
+    PLAYER_COLOR,
     SYSTEM_COLOR,
     THINKING_COLOR,
     get_character_color,
@@ -69,13 +70,6 @@ def create_turn_card(
     return card
 
 
-def create_message_block(
-    container: ui.element, label: str, color: str
-) -> StreamingTextBlock:
-    """Create a labeled message block inside a container for streaming."""
-    return StreamingTextBlock(container, label, color)
-
-
 def create_narrator_block(container: ui.element) -> StreamingTextBlock:
     """Create a narrator message block."""
     return StreamingTextBlock(container, "Narrator", NARRATOR_NAME_COLOR)
@@ -99,10 +93,10 @@ def create_player_block(
     """Create a non-streaming player message block."""
     with container:
         ui.label(player_name).style(
-            "color: #ffffff; font-weight: bold; margin-bottom: 4px;"
+            f"color: {PLAYER_COLOR}; font-weight: bold; margin-bottom: 4px;"
         )
         ui.html(
-            f'<div style="color: #cccccc; white-space: pre-wrap;">'
+            f'<div style="color: {NARRATOR_COLOR}; white-space: pre-wrap;">'
             f"{html_lib.escape(text)}</div>"
         )
 
@@ -163,11 +157,11 @@ def render_static_turn(
         elif entry.role == "player":
             with card:
                 ui.label(player_name).style(
-                    "color: #ffffff; font-weight: bold; "
+                    f"color: {PLAYER_COLOR}; font-weight: bold; "
                     "margin-bottom: 4px; margin-top: 8px;"
                 )
                 ui.html(
-                    f'<div style="color: #cccccc; white-space: pre-wrap;">'
+                    f'<div style="color: {NARRATOR_COLOR}; white-space: pre-wrap;">'
                     f"{html_lib.escape(entry.content)}</div>"
                 )
         elif entry.role == "character":

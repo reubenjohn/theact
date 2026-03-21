@@ -8,7 +8,6 @@ gameplay view using container visibility toggling.
 from __future__ import annotations
 
 import logging
-import re
 import shutil
 from datetime import datetime, timezone
 
@@ -21,21 +20,12 @@ from theact.io.save_manager import (
     list_games,
     list_saves,
     load_save,
+    slugify,
 )
 from theact.llm.config import load_llm_config
 from theact.web.session import GameplaySession
 
 logger = logging.getLogger(__name__)
-
-
-def slugify(text: str) -> str:
-    """Convert free-form text to a URL-safe slug."""
-    slug = text.lower().strip()
-    slug = re.sub(r"[^a-z0-9\s-]", "", slug)
-    slug = re.sub(r"[\s]+", "-", slug)
-    slug = re.sub(r"-+", "-", slug)
-    slug = slug.strip("-")
-    return slug or "save"
 
 
 def setup_app() -> None:

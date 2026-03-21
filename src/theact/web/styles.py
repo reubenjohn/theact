@@ -29,7 +29,6 @@ THINKING_COLOR = "#888888"
 SYSTEM_COLOR = "#9e9e9e"
 
 # --- Status / info ---
-STATUS_COLOR = "#9e9e9e"
 ERROR_COLOR = "#ff5252"
 
 

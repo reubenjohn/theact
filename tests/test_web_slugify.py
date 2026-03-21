@@ -1,6 +1,6 @@
 """Tests for the web UI slugify function."""
 
-from theact.web.app import slugify
+from theact.io.save_manager import slugify
 
 
 class TestSlugify:
