@@ -43,13 +43,23 @@ The plans show clean interfaces, but during Phase 03 implementation, resist the 
 
 The turn engine records entries as: narrator → player → characters. This is a narrative convention (narrator sets the scene, player action is noted, characters react). It works but is slightly counterintuitive since chronologically the player spoke first. Be consistent with this ordering in context assembly.
 
-### `getting_started.py` is throwaway
-
-`src/getting_started.py` is a Venice AI connection test from before planning. It will be superseded by `scripts/test_llm.py` in Phase 02. Remove it once Phase 02 is implemented.
-
 ### File size discipline
 
 The single most important constraint: game files must stay tiny. Character files ~60 words, world ~6 sentences, chapter beats are short phrases. If you find yourself writing a 200-word character backstory, stop. A 7B model with 8K context cannot afford it.
+
+### Phases 09-11: Context from prior implementation
+
+Phases 01-07 are fully implemented. 396 tests pass. Here is critical context for implementing Phases 09-11:
+
+**Live integration test results (Phase 03):** The 7B model (`olafangensan-glm-4.7-flash-heretic`) was tested with `scripts/test_turn.py` running 3 turns against Lost Island. Every structured output call failed — the model never produced fenced YAML blocks. The narrator returned empty `responding_characters` every turn. All YAML parsing fell back to the "no fenced block" path, which also failed. The model DID produce content (narration text), but it was not wrapped in YAML. This is the primary problem Phase 11 must solve, and Phases 09-10 build the tools to solve it efficiently.
+
+**Thinking token behavior:** The model uses `<think>` tags and consumes 500-2000 tokens for reasoning before producing content. `max_tokens` was increased to 2048 for narrator and 1500 for other agents to accommodate this. The streaming layer correctly separates thinking from content tokens.
+
+**`importlib.reload` caveat:** Phase 10's turn debugger `edit_and_replay` must reload BOTH `prompts.py` AND `context.py` because context.py uses `from theact.agents.prompts import ...` which copies values at import time. This is documented in the Phase 10 plan.
+
+**Build order for 09-11:** Phase 09 and Phase 10 Part A (save versioning) are independent — can be built in parallel. Phase 10 Part B (turn debugger) benefits from Phase 09's `LLMCallLog` but degrades gracefully without it. Phase 11 depends on both 09 and 10 being operational.
+
+**Existing diagnostic tooling:** `scripts/diagnose_agent.py` already exists and tests individual agents against the live API. `scripts/test_turn.py` runs 3-turn integration tests. `scripts/playtest.py` runs autonomous N-turn playtests. Phase 09 enhances these with structured logging; Phase 10 adds interactive debugging.
 
 ---
 
