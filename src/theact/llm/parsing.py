@@ -27,9 +27,7 @@ class YAMLParseError(Exception):
         self.failure_type = failure_type or classify_parse_failure(raw_content)
 
 
-def classify_parse_failure(
-    raw_content: str, error: Exception | None = None
-) -> ParseFailureType:
+def classify_parse_failure(raw_content: str) -> ParseFailureType:
     """Classify a parse failure based on the raw LLM response content.
 
     Returns the most specific ParseFailureType that matches the content.
@@ -119,7 +117,7 @@ def extract_yaml_block(text: str) -> str:
     return text.strip()
 
 
-def repair_yaml_text(text: str) -> str:
+def _repair_yaml_text(text: str) -> str:
     """Attempt to fix common YAML formatting issues from 7B models.
 
     Applied fixes (in order):
@@ -170,7 +168,7 @@ def parse_yaml_response(text: str) -> dict[str, Any]:
         result = yaml.safe_load(yaml_str)
     except yaml.YAMLError:
         # First parse failed — try repair before giving up.
-        repaired = repair_yaml_text(yaml_str)
+        repaired = _repair_yaml_text(yaml_str)
         try:
             result = yaml.safe_load(repaired)
             logger.warning(

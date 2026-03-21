@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator
 
 
 @dataclass
@@ -13,11 +13,11 @@ class LLMResult:
     content: str
     thinking: str  # thinking/reasoning tokens (may be empty)
     finish_reason: str  # "stop", "length", etc.
-    prompt_tokens: Optional[int] = None
-    completion_tokens: Optional[int] = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
 
     @property
-    def total_tokens(self) -> Optional[int]:
+    def total_tokens(self) -> int | None:
         if self.prompt_tokens is not None and self.completion_tokens is not None:
             return self.prompt_tokens + self.completion_tokens
         return None
@@ -29,7 +29,7 @@ class StreamChunk:
 
     content: str = ""  # response content delta
     thinking: str = ""  # thinking content delta
-    finish_reason: Optional[str] = None
+    finish_reason: str | None = None
 
     @property
     def is_thinking(self) -> bool:
@@ -53,8 +53,8 @@ class StructuredResult:
     thinking: str
     attempts: int = 1  # how many tries it took
     finish_reason: str = "stop"
-    prompt_tokens: Optional[int] = None
-    completion_tokens: Optional[int] = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
 
 
 # Partial prefixes of <think> and </think> that could appear at the end
@@ -114,7 +114,8 @@ async def process_stream(
             tag_buffer = ""
 
         # Buffer trailing characters that could be the start of a tag
-        for i in range(min(len(content), 8), 0, -1):
+        max_prefix_len = max(len(p) for p in _TAG_PREFIXES)
+        for i in range(min(len(content), max_prefix_len), 0, -1):
             if content[-i:] in _TAG_PREFIXES:
                 tag_buffer = content[-i:]
                 content = content[:-i]

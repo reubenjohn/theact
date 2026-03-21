@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import yaml
@@ -74,7 +74,7 @@ class LLMCallLog:
         return {
             "total_calls": total,
             "mean_latency_ms": round(total_latency / total),
-            "parse_success_rate": round(successes / total, 3) if total else 0.0,
+            "parse_success_rate": round(successes / total, 3),
             "total_prompt_tokens": sum(r.prompt_tokens for r in self.records),
             "total_thinking_tokens": sum(r.thinking_tokens for r in self.records),
             "total_content_tokens": sum(r.content_tokens for r in self.records),
@@ -113,25 +113,7 @@ class LLMCallLog:
 
     def dump_yaml(self, path: Path) -> None:
         """Write all records to a YAML file."""
-        data = []
-        for r in self.records:
-            data.append(
-                {
-                    "timestamp": r.timestamp,
-                    "agent": r.agent,
-                    "turn": r.turn,
-                    "prompt_tokens": r.prompt_tokens,
-                    "thinking_tokens": r.thinking_tokens,
-                    "content_tokens": r.content_tokens,
-                    "latency_ms": r.latency_ms,
-                    "finish_reason": r.finish_reason,
-                    "parse_result": r.parse_result,
-                    "parse_attempts": r.parse_attempts,
-                    "retry_count": r.retry_count,
-                    "temperature": r.temperature,
-                    "max_tokens": r.max_tokens,
-                }
-            )
+        data = [asdict(r) for r in self.records]
 
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:

@@ -67,9 +67,8 @@ class TestClassifyParseFailure:
         text = "Some random text that isn't YAML or JSON"
         assert classify_parse_failure(text) == ParseFailureType.wrong_schema
 
-    def test_error_parameter_accepted(self):
-        # The error parameter is accepted but doesn't change classification for now
-        result = classify_parse_failure("", error=ValueError("test"))
+    def test_empty_string_classified(self):
+        result = classify_parse_failure("")
         assert result == ParseFailureType.empty_response
 
 

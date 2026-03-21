@@ -23,11 +23,6 @@ class AgentProfile:
     context_limit: int = 8192
     headroom: int = 0  # context_limit - total_prompt - max_tokens_budget
 
-    # Optional breakdown fields
-    conversation_tokens: int = 0
-    chapter_context_tokens: int = 0
-    memory_tokens: int = 0
-
 
 def profile_messages(
     agent: str,

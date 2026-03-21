@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -23,8 +22,8 @@ class LLMConfig:
 class AgentLLMConfig:
     """Per-agent-type overrides. Merged with LLMConfig at call time."""
 
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
+    temperature: float | None = None
+    max_tokens: int | None = None
     structured: bool = False  # whether to parse YAML from response
     max_retries: int = 2  # retries on YAML parse failure
     retry_temperature_bump: float = 0.1  # increase temp on each retry
