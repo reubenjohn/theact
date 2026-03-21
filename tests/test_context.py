@@ -170,12 +170,12 @@ class TestFormatChapterContext:
         result = format_chapter_context(lost_island_game)
         assert "[x] Player wakes on the beach" in result
         # Other beats should be unchecked
-        assert "[ ] Explores crash debris" in result
+        assert "[ ] Explores wreckage and finds basic supplies" in result
 
     def test_includes_upcoming(self, lost_island_game: LoadedGame):
         result = format_chapter_context(lost_island_game)
         assert "UPCOMING:" in result
-        assert "Survival" in result
+        assert "The Discovery" in result
 
     def test_includes_completed_summaries(self, lost_island_game: LoadedGame):
         from theact.models.chapter import ChapterSummary

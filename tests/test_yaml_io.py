@@ -232,5 +232,5 @@ class TestExampleGameFiles:
     def test_load_chapter(self):
         chap = load_yaml(self.GAMES_DIR / "chapters" / "01-the-crash.yaml", Chapter)
         assert chap.id == "01-the-crash"
-        assert chap.next == "02-survival"
+        assert chap.next == "02-the-discovery"
         assert len(chap.beats) == 6
