@@ -97,9 +97,33 @@ The creator agent generates a complete game from a text description:
 uv run python scripts/create_game.py
 ```
 
-It will ask for your game concept, then run a multi-step pipeline: propose game structure, validate against Pydantic models, fix any issues, and write the files to `games/`.
+The interactive session walks you through these steps:
 
-The creator uses a **larger model** (configured via `CREATOR_*` environment variables in `.env`). See [`.env.example`](../../.env.example) for configuration. The pipeline is implemented in [`src/theact/creator/session.py`](../../src/theact/creator/session.py).
+1. **Describe your concept** — Genre, setting, characters, what the player does. A few sentences is enough.
+2. **Review the proposal** — The LLM generates a high-level structure (title, id, setting, tone, characters, chapters). Type feedback to revise, or `ok` to proceed.
+3. **Generation** — The LLM produces all game YAML files from the approved proposal.
+4. **Validation & auto-fix** — Files are validated against Pydantic models and cross-reference checks. Errors are automatically sent back to the LLM for correction (up to 3 attempts).
+5. **Size warnings** — Files exceeding recommended token budgets are flagged.
+6. **Final review** — You see all generated files. Type feedback to revise specific parts, or `ok` to finalize.
+7. **Write to disk** — Files are written to `games/<game-id>/`.
+
+### How game-id is determined
+
+The **LLM chooses the game-id** during the proposal step. The prompt asks it to generate `id: "url-safe-slug"` based on your concept (e.g., a pirate adventure might get `id: "black-tide"`). This id becomes both the `game.yaml` id field and the directory name under `games/`. If a directory with that id already exists, you'll be prompted before overwriting.
+
+### Configuration
+
+The creator uses a **larger model** than the 7B gameplay model. Configure it via environment variables in `.env`:
+
+| Variable | Fallback | Purpose |
+|----------|----------|---------|
+| `CREATOR_MODEL` | `VENICE_MODEL` | Model to use for generation |
+| `CREATOR_API_KEY` | `VENICE_API_KEY` | API key |
+| `CREATOR_BASE_URL` | `VENICE_BASE_URL` | API endpoint |
+
+If no `CREATOR_MODEL` is set and the resolved model is the 7B default, a warning is printed. Game creation works best with a more capable model.
+
+For the full design details, see [Creator Agent](../design/creator.md).
 
 ## Testing Your Game
 

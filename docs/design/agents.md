@@ -13,7 +13,7 @@ Each agent in TheAct makes exactly one LLM call to do exactly one task. The code
 | Chapter Summary | Summarizes a completed chapter | Plain text (2-3 sentences) | [`agents/summarizer.py`](../../src/theact/agents/summarizer.py) |
 | Rolling Summary | Merges old conversation into running summary | Plain text (under 5 sentences) | [`agents/summarizer.py`](../../src/theact/agents/summarizer.py) |
 
-All agents run during gameplay using the small model (`olafangensan-glm-4.7-flash-heretic`). The game **creator agent** (a separate pipeline) uses a larger model — see [`src/theact/creator/`](../../src/theact/creator/).
+All agents run during gameplay using the small model (`olafangensan-glm-4.7-flash-heretic`). The game **creator agent** is a separate multi-step pipeline that uses a larger model — see [Creator Agent](creator.md) for its design.
 
 ## Prompt Design for Small Models
 

@@ -31,6 +31,7 @@ TheAct is a programmatically-driven text RPG engine designed for small language 
 | [Data Model](design/data-model.md) | Game files, save files, Pydantic models |
 | [Memory & Summarization](design/memory-and-summarization.md) | Character memory, rolling summary, context budgeting |
 | [Observability](design/observability.md) | Call logging, diagnostics, error taxonomy design |
+| [Creator Agent](design/creator.md) | Game creation pipeline, proposal/generation phases, validation |
 | [Turn Debugger](design/debugger.md) | Debugger architecture and design decisions |
 
 ## Reference
