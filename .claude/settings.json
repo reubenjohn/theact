@@ -10,7 +10,18 @@
       "mcp__playwright__browser_type",
       "mcp__playwright__browser_wait_for",
       "mcp__playwright__browser_snapshot",
-      "mcp__playwright__browser_take_screenshot"
+      "mcp__playwright__browser_take_screenshot",
+      "Bash(prek src/theact/commands/ src/theact/cli/commands.py tests/test_command_logic.py)",
+      "Bash(prek --refresh:*)",
+      "Bash(prek --refresh)",
+      "Read(//home/reuben/**)",
+      "Bash(npx -y @playwright/test@latest show browsers-path)",
+      "Bash(npx -y @playwright/test@latest show chromium)",
+      "Bash(pip show:*)",
+      "Bash(uv pip:*)",
+      "Bash(prek)",
+      "Bash(uv tool:*)",
+      "Bash(npx -y @playwright/test@latest install --dry-run chromium)"
     ]
   }
 }
