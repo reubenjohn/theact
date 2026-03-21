@@ -22,6 +22,7 @@ TheAct is built in sequential phases. Each plan document is self-contained with 
 | 10 | [10-SaveVersioningAndTurnDebugger.md](10-SaveVersioningAndTurnDebugger.md) | Save-as/fork, peek, diff, interactive turn debugger | 01, 03, 09 |
 | 11 | [11-SmallModelHardening.md](11-SmallModelHardening.md) | Prompt iteration, YAML reliability, token budgets, golden scenarios | 09, 10 |
 | 12 | [12-CreatorSmallModelHardening.md](12-CreatorSmallModelHardening.md) | Brainstorm tool, decomposed proposal & generation, per-file fixing for small models | 06, 11 |
+| 13 | [13-WebUIExpansion/](13-WebUIExpansion/README.md) | Web UI expansion: toolbar, sidebar, history, creator wizard, settings, playtest, diagnostics, polish | 07, 01–12 |
 
 ## Cross-Cutting Implementation Notes
 
@@ -226,4 +227,36 @@ Keep the "PROPOSAL_" prefix on proposal-phase prompts to avoid confusion.
 After implementation, test with the 7B model:
   CREATOR_MODEL=olafangensan-glm-4.7-flash-heretic uv run python scripts/brainstorm.py --create
   uv run python scripts/playtest.py --game <created-game-id> --turns 10
+```
+
+**Phase 13** — append:
+```
+Phase 13 is a FOLDER with a README and 8 step files (01-08). Read the
+README first — it contains key API references, data models, and execution
+guidance that applies to all steps.
+
+Build steps in order (01 through 08). Steps 04 and 05 can be parallelized.
+
+CRITICAL: After implementing each step or significant sub-feature:
+  1. Start the dev server: uv run scripts/dev_server.py start --port 8111
+  2. Use Playwright MCP to manually validate (navigate, screenshot, interact)
+  3. Convert every issue found during manual testing into an automated test
+  4. Run: uv run pytest tests/web/ -v
+
+When delegating to subagents, ALWAYS include this instruction in the prompt:
+  "After completing your implementation, report back any concerns about
+   the approach, ideas for improvements, assumptions you made, and edge
+   cases you noticed but didn't handle."
+
+Review subagent reports before proceeding. Do not ignore their feedback.
+
+Existing web tests are SYNC (playwright.sync_api, def not async def,
+web_server fixture not running_app). Match this pattern for all new tests.
+
+NiceGUI quirks to watch for:
+  - ui.right_drawer must be a direct child of the page, not nested
+  - ui.echart (not ui.chart) for Apache ECharts
+  - app.storage.tab requires await ui.context.client.connected() first
+  - ui.keyboard(ignore=[]) to capture shortcuts when input is focused
+  - @ui.refreshable methods: call .refresh() attribute, not re-invoke
 ```
