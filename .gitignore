@@ -10,3 +10,6 @@ playtests/
 diagnostics/
 .playwright-mcp/
 site/
+
+# Web UI settings (may contain API keys)
+settings.yaml

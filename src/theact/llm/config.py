@@ -67,7 +67,34 @@ SUMMARIZER_CONFIG = AgentLLMConfig(
 
 
 def load_llm_config() -> LLMConfig:
-    """Load LLM configuration from environment variables."""
+    """Load LLM configuration from settings.yaml, falling back to env vars.
+
+    When settings.yaml exists, it is used as the primary source for all
+    LLM configuration fields. When it does not exist, behavior is identical
+    to the original env-var-only path.
+    """
+    from theact.io.settings_store import SETTINGS_FILE, load_settings
+
+    # If settings.yaml exists, use it as the primary source
+    if SETTINGS_FILE.exists():
+        settings = load_settings()
+        api_key = settings.llm_api_key
+        if not api_key:
+            api_key = os.environ.get("LLM_API_KEY", "")
+        if not api_key:
+            raise ValueError(
+                "LLM_API_KEY not configured. Set it in Settings or in your .env file."
+            )
+        return LLMConfig(
+            base_url=settings.llm_base_url,
+            api_key=api_key,
+            model=settings.llm_model,
+            default_temperature=settings.llm_temperature,
+            default_max_tokens=settings.llm_max_tokens,
+            context_limit=settings.llm_context_limit,
+        )
+
+    # Original env-var-only path (unchanged)
     api_key = os.environ.get("LLM_API_KEY", "")
     if not api_key:
         raise ValueError(

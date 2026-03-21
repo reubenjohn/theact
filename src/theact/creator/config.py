@@ -68,26 +68,60 @@ _GAMEPLAY_MODEL = "olafangensan-glm-4.7-flash-heretic"
 
 
 def load_creator_config() -> CreatorLLMConfig:
-    """Load creator config from environment variables.
+    """Load creator config from settings.yaml or environment variables.
 
-    Checks CREATOR_* vars first, falls back to LLM_* vars.
-    Prints a warning if the resolved model is the small 7B gameplay model,
-    since game creation requires a more capable model.
+    When settings.yaml exists:
+      - If creator_use_same is True (or creator fields are empty), uses
+        the primary LLM config values for the creator.
+      - If creator_use_same is False and creator fields are populated,
+        uses the creator-specific values.
+
+    When settings.yaml does not exist, falls back to the original
+    env-var-only path (CREATOR_* -> LLM_* -> defaults).
     """
-    config = CreatorLLMConfig(
-        base_url=os.getenv(
-            "CREATOR_BASE_URL",
-            os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
-        ),
-        api_key=os.getenv(
-            "CREATOR_API_KEY",
-            os.getenv("LLM_API_KEY", ""),
-        ),
-        model=os.getenv(
-            "CREATOR_MODEL",
-            os.getenv("LLM_MODEL", _GAMEPLAY_MODEL),
-        ),
-    )
+    from theact.io.settings_store import SETTINGS_FILE, load_settings
+
+    if SETTINGS_FILE.exists():
+        settings = load_settings()
+
+        # Determine whether to use creator-specific or primary LLM config
+        if settings.creator_use_same or not settings.creator_model:
+            # Use primary LLM config values
+            api_key = settings.llm_api_key or os.getenv("LLM_API_KEY", "")
+            base_url = settings.llm_base_url
+            model = settings.llm_model or os.getenv("LLM_MODEL", _GAMEPLAY_MODEL)
+        else:
+            # Use creator-specific values
+            api_key = (
+                settings.creator_api_key
+                or settings.llm_api_key
+                or os.getenv("CREATOR_API_KEY", "")
+                or os.getenv("LLM_API_KEY", "")
+            )
+            base_url = settings.creator_base_url
+            model = settings.creator_model
+
+        config = CreatorLLMConfig(
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+        )
+    else:
+        # Original env-var-only path (unchanged)
+        config = CreatorLLMConfig(
+            base_url=os.getenv(
+                "CREATOR_BASE_URL",
+                os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
+            ),
+            api_key=os.getenv(
+                "CREATOR_API_KEY",
+                os.getenv("LLM_API_KEY", ""),
+            ),
+            model=os.getenv(
+                "CREATOR_MODEL",
+                os.getenv("LLM_MODEL", _GAMEPLAY_MODEL),
+            ),
+        )
 
     if config.is_small_model:
         warnings.warn(
@@ -99,7 +133,8 @@ def load_creator_config() -> CreatorLLMConfig:
 
     if not config.api_key:
         raise ValueError(
-            "No API key found. Set CREATOR_API_KEY or LLM_API_KEY in .env."
+            "No API key found. Set CREATOR_API_KEY or LLM_API_KEY in .env, "
+            "or configure it in Settings."
         )
 
     return config
