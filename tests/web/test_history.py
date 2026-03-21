@@ -12,7 +12,7 @@ import pytest
 from playwright.sync_api import expect
 
 from theact.io.save_manager import SAVES_DIR, create_save
-from tests.web.conftest import _remove_lock_file
+from tests.web.conftest import _load_save_into_gameplay
 
 _TEST_SAVE_ID = "pw-test-history"
 
@@ -31,23 +31,7 @@ def ensure_test_save():
 @pytest.fixture
 def gameplay_page(page, web_server, ensure_test_save):
     """Navigate to the gameplay view by loading the test save."""
-    # Remove any stale lock file before loading
-    _remove_lock_file(SAVES_DIR / _TEST_SAVE_ID)
-
-    page.goto(web_server)
-    page.wait_for_load_state("networkidle")
-    save_card = page.locator(f'[data-testid="save-card-{_TEST_SAVE_ID}"]')
-    save_card.locator("button").first.click()
-    page.locator('input[placeholder="What do you do?"]').wait_for(
-        state="visible", timeout=10000
-    )
-
-    # Dismiss any save lock conflict dialog that may have appeared
-    dialog_btn = page.get_by_role("button", name="Force Unlock")
-    if dialog_btn.is_visible(timeout=1000):
-        dialog_btn.click()
-        page.wait_for_timeout(500)
-
+    _load_save_into_gameplay(page, web_server, _TEST_SAVE_ID, SAVES_DIR / _TEST_SAVE_ID)
     return page
 
 
