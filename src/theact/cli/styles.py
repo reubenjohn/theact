@@ -4,7 +4,6 @@ from rich.style import Style
 
 # --- Narrative styles ---
 NARRATOR_STYLE = Style(color="white", italic=True)
-NARRATOR_LABEL_STYLE = Style(color="bright_white", bold=True, italic=True)
 
 # --- Character styles ---
 # Characters get assigned colors from this palette in order of appearance.
@@ -17,7 +16,6 @@ CHARACTER_COLORS = [
     "bright_blue",
 ]
 
-CHARACTER_NAME_STYLE = Style(bold=True)  # combined with character color
 
 # --- Player styles ---
 PLAYER_STYLE = Style(color="bright_white", bold=True)
@@ -29,7 +27,6 @@ THINKING_LABEL_STYLE = Style(color="bright_black", bold=True, dim=True)
 # --- UI styles ---
 STATUS_STYLE = Style(color="bright_black")
 ERROR_STYLE = Style(color="red", bold=True)
-TURN_HEADER_STYLE = Style(color="bright_black", bold=True)
 COMMAND_OUTPUT_STYLE = Style(color="bright_black")
 
 # --- Separators ---

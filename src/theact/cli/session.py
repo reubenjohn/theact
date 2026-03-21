@@ -22,6 +22,7 @@ from theact.cli.commands import (
 )
 from theact.cli.renderer import Renderer
 from theact.cli.styles import (
+    ERROR_STYLE,
     NARRATOR_STYLE,
     PLAYER_STYLE,
     STATUS_STYLE,
@@ -188,7 +189,7 @@ class GameSession:
         else:
             self.console.print(
                 f"Unknown command: /{cmd}. Type /help for available commands.",
-                style=Style(color="red"),
+                style=ERROR_STYLE,
             )
         return False
 

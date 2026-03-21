@@ -13,11 +13,10 @@ from theact.cli.menu import (
     prompt_text,
     show_game_list,
     show_save_list,
-    slugify,
 )
 from theact.cli.session import GameSession
 from theact.cli.styles import ERROR_STYLE, STATUS_STYLE
-from theact.io.save_manager import create_save, load_save
+from theact.io.save_manager import SAVES_DIR, create_save, load_save, slugify
 from theact.llm.config import LLMConfig, load_llm_config
 from theact.models.game import LoadedGame
 
@@ -177,8 +176,6 @@ class Application:
         ):
             self.console.print("Cancelled.", style=STATUS_STYLE)
             return
-
-        from theact.io.save_manager import SAVES_DIR
 
         save_path = SAVES_DIR / save_info["id"]
         if save_path.exists():

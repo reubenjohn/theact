@@ -1,6 +1,7 @@
 """Save management: create, load, list, and update saves."""
 
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -260,3 +261,17 @@ def _character_name_to_stem(save_path: Path, character_name: str) -> str:
 def save_summaries(save_path: Path, summaries: list[ChapterSummary]) -> None:
     """Write the full list of chapter summaries to summaries.yaml (full rewrite)."""
     dump_yaml_list(save_path / "summaries.yaml", summaries)
+
+
+def slugify(text: str) -> str:
+    """Convert a free-form name to a URL-safe slug.
+
+    Lowercase, replace spaces/special chars with hyphens,
+    strip leading/trailing hyphens, collapse multiple hyphens.
+    """
+    slug = text.lower().strip()
+    slug = re.sub(r"[^a-z0-9\s-]", "", slug)
+    slug = re.sub(r"[\s]+", "-", slug)
+    slug = re.sub(r"-+", "-", slug)
+    slug = slug.strip("-")
+    return slug or "save"

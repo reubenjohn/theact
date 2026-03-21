@@ -1,7 +1,7 @@
 """Tests for CLI command parsing and menu utilities."""
 
 from theact.cli.commands import parse_command
-from theact.cli.menu import slugify
+from theact.io.save_manager import slugify
 from theact.cli.styles import CHARACTER_COLORS, get_character_color
 
 

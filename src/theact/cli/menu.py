@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import shutil
 from datetime import datetime, timezone
 
@@ -104,20 +103,6 @@ def confirm(console: Console, message: str) -> bool:
     except EOFError:
         return False
     return raw.strip().lower() in ("y", "yes")
-
-
-def slugify(text: str) -> str:
-    """Convert a free-form name to a URL-safe slug.
-
-    Lowercase, replace spaces/special chars with hyphens,
-    strip leading/trailing hyphens, collapse multiple hyphens.
-    """
-    slug = text.lower().strip()
-    slug = re.sub(r"[^a-z0-9\s-]", "", slug)
-    slug = re.sub(r"[\s]+", "-", slug)
-    slug = re.sub(r"-+", "-", slug)
-    slug = slug.strip("-")
-    return slug or "save"
 
 
 def delete_save_dir(save_path) -> None:
