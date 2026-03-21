@@ -177,7 +177,7 @@ class GameplaySession:
             self._think_switch.on_value_change(self._on_think_toggle)
 
             ui.button(icon="info", on_click=self._toggle_sidebar).props(
-                "flat dense"
+                'flat dense aria-label="Toggle game state sidebar"'
             ).tooltip("Toggle game state sidebar").style("color: #999;")
 
             ui.button("Menu", on_click=self._handle_quit, icon="home").props(

@@ -47,7 +47,7 @@ def setup_app() -> None:
                 "w-full max-w-3xl mx-auto p-4"
             )
             page_state["gameplay_container"] = ui.column().classes(
-                "w-full max-w-3xl mx-auto"
+                "w-full max-w-6xl mx-auto"
             )
             page_state["gameplay_container"].set_visibility(False)
 
