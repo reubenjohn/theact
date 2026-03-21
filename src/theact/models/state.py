@@ -15,3 +15,8 @@ class GameState(BaseModel):
     flags: dict[str, str]  # Arbitrary key-value pairs set by agents
     chapter_history: list[str]  # List of completed chapter ids
     rolling_summary: str = ""  # Incremental summary of expired conversation turns.
+    last_summarized_turn: int = 0  # Turn number up to which summary covers.
+    game_complete: bool = False  # True when the final chapter is completed.
+    chapter_just_advanced: bool = (
+        False  # Set after chapter advance, cleared after narrator reads it.
+    )
