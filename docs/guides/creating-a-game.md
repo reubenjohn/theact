@@ -116,9 +116,9 @@ The creator agent supports its own model configuration, since game creation work
 
 | Env var | Fallback | Default |
 |---|---|---|
-| `CREATOR_BASE_URL` | `VENICE_BASE_URL` | `https://api.venice.ai/api/v1` |
-| `CREATOR_API_KEY` | `VENICE_API_KEY` | (required) |
-| `CREATOR_MODEL` | `VENICE_MODEL` | `olafangensan-glm-4.7-flash-heretic` |
+| `CREATOR_BASE_URL` | `LLM_BASE_URL` | `https://api.openai.com/v1` |
+| `CREATOR_API_KEY` | `LLM_API_KEY` | (required) |
+| `CREATOR_MODEL` | `LLM_MODEL` | (none) |
 
 See [Game Creation Pipeline](../reference/game-creation-pipeline.md) for internal design details.
 

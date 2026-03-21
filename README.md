@@ -33,7 +33,7 @@ flowchart LR
 
 ```bash
 uv sync
-cp .env.example .env                 # Add your VENICE_API_KEY
+cp .env.example .env                 # Add your LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
 uv run python scripts/test_llm.py   # Verify LLM connection
 uv run python -m theact             # Play
 ```
@@ -51,7 +51,7 @@ uv run python -m theact             # Play
 ## Tech Stack
 
 - **Python 3.11** + uv
-- **Venice AI** (OpenAI-compatible) with small thinking models
+- **Any OpenAI-compatible API** (OpenAI, OpenRouter, Together AI, Groq, Ollama, Venice AI, vLLM)
 - **Pydantic v2** -- data models with strict validation
 - **PyYAML** -- all data files and structured LLM output
 - **GitPython** -- save versioning

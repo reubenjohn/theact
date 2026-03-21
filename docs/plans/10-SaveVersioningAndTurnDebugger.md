@@ -1290,7 +1290,7 @@ src/theact/web/commands.py         # Add /save-as for web UI
 
 **File:** `tests/test_debugger.py`
 
-The debugger makes real LLM calls, so full integration tests require `VENICE_API_KEY`. Unit tests verify the non-LLM parts: session planning, step tracking, fixture saving, comparison formatting.
+The debugger makes real LLM calls, so full integration tests require `LLM_API_KEY`. Unit tests verify the non-LLM parts: session planning, step tracking, fixture saving, comparison formatting.
 
 ### 7.1 Unit Tests (No LLM Calls)
 
@@ -1364,12 +1364,12 @@ class TestTurnDebuggerPlan:
 
 ### 7.2 Integration Tests (Requires LLM)
 
-These tests are marked with `@pytest.mark.skipif` if `VENICE_API_KEY` is not set. They verify the full debugger workflow against the live model.
+These tests are marked with `@pytest.mark.skipif` if `LLM_API_KEY` is not set. They verify the full debugger workflow against the live model.
 
 ```python
 @pytest.mark.skipif(
-    not os.environ.get("VENICE_API_KEY"),
-    reason="Requires VENICE_API_KEY",
+    not os.environ.get("LLM_API_KEY"),
+    reason="Requires LLM_API_KEY",
 )
 class TestTurnDebuggerIntegration:
     @pytest.fixture

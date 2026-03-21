@@ -40,7 +40,7 @@ def setup_app() -> None:
             llm_config = load_llm_config()
         except ValueError as e:
             ui.label(str(e)).style("color: #ff5252; padding: 20px;")
-            ui.label("Create a .env file with VENICE_API_KEY=your_key_here").style(
+            ui.label("Create a .env file with LLM_API_KEY=your_key_here").style(
                 "color: #999; padding: 0 20px;"
             )
             return

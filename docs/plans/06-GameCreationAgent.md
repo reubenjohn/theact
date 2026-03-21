@@ -17,7 +17,7 @@ After this phase is complete, we can:
 
 ### Key Design Decision: Model Selection
 
-This agent does NOT use the small 7B Venice AI model. Game creation is a one-time creative task that demands strong instruction following, long-range coherence, and the ability to produce precisely formatted output under tight size constraints. It uses a larger, more capable model (Claude, GPT-4, or equivalent) configured separately from the gameplay LLM.
+This agent does NOT use the small 7B gameplay model. Game creation is a one-time creative task that demands strong instruction following, long-range coherence, and the ability to produce precisely formatted output under tight size constraints. It uses a larger, more capable model (Claude, GPT-4, or equivalent) configured separately from the gameplay LLM.
 
 However, everything the agent *produces* must be optimized for a 7B model to consume. Character files must be ~60 words. World files must be ~6 sentences. Chapter beats must be short phrases, not paragraphs. The creative model's job is to compress rich ideas into tiny, precise definitions.
 
@@ -91,7 +91,7 @@ The creator module does NOT depend on:
 The creation agent needs its own OpenAI-compatible client because it uses a different model, endpoint, and API key than the gameplay agents. Two supported configurations:
 
 1. **OpenAI-compatible API** (default) -- any provider exposing the `/v1/chat/completions` endpoint (OpenAI, Anthropic via proxy, local models via vLLM/Ollama, etc.)
-2. **Environment-driven** -- configured via `CREATOR_API_KEY`, `CREATOR_BASE_URL`, `CREATOR_MODEL` env vars, falling back to `VENICE_API_KEY` / Venice defaults if not set
+2. **Environment-driven** -- configured via `CREATOR_API_KEY`, `CREATOR_BASE_URL`, `CREATOR_MODEL` env vars, falling back to `LLM_API_KEY` / `LLM_*` defaults if not set
 
 This keeps the creation agent decoupled from the gameplay LLM infrastructure while reusing the same OpenAI Python library.
 
@@ -1223,15 +1223,15 @@ class CreatorLLMConfig:
     """LLM configuration for the game creation agent.
 
     Uses a separate, more capable model than the gameplay agents.
-    Checks CREATOR_* env vars first, then VENICE_* env vars.
+    Checks CREATOR_* env vars first, then LLM_* env vars.
 
-    IMPORTANT: The default VENICE_MODEL (olafangensan-glm-4.7-flash-heretic)
+    IMPORTANT: The default LLM_MODEL (olafangensan-glm-4.7-flash-heretic)
     is a 7B model that CANNOT reliably perform game creation. If no
     CREATOR_MODEL is set and the resolved model is the 7B default, a
     warning is printed at session start. The user should set CREATOR_MODEL
     to a capable model (e.g., gpt-4o, claude-sonnet-4-20250514).
     """
-    base_url: str = "https://api.venice.ai/api/v1"
+    base_url: str = "https://api.openai.com/v1"
     api_key: str = ""
     model: str = "olafangensan-glm-4.7-flash-heretic"
     temperature: float = 0.7      # moderate creativity for game design
@@ -1253,22 +1253,22 @@ _GAMEPLAY_MODEL = "olafangensan-glm-4.7-flash-heretic"
 def load_creator_config() -> CreatorLLMConfig:
     """Load creator config from environment variables.
 
-    Checks CREATOR_* vars first, falls back to VENICE_* vars.
+    Checks CREATOR_* vars first, falls back to LLM_* vars.
     Prints a warning if the resolved model is the small 7B gameplay model,
     since game creation requires a more capable model.
     """
     config = CreatorLLMConfig(
         base_url=os.getenv(
             "CREATOR_BASE_URL",
-            os.getenv("VENICE_BASE_URL", "https://api.venice.ai/api/v1"),
+            os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
         ),
         api_key=os.getenv(
             "CREATOR_API_KEY",
-            os.getenv("VENICE_API_KEY", ""),
+            os.getenv("LLM_API_KEY", ""),
         ),
         model=os.getenv(
             "CREATOR_MODEL",
-            os.getenv("VENICE_MODEL", _GAMEPLAY_MODEL),
+            os.getenv("LLM_MODEL", _GAMEPLAY_MODEL),
         ),
     )
 
@@ -1283,7 +1283,7 @@ def load_creator_config() -> CreatorLLMConfig:
 
     if not config.api_key:
         raise ValueError(
-            "No API key found. Set CREATOR_API_KEY or VENICE_API_KEY in .env."
+            "No API key found. Set CREATOR_API_KEY or LLM_API_KEY in .env."
         )
 
     return config
@@ -1293,7 +1293,7 @@ The `.env.example` file should be updated with:
 
 ```
 # Game Creation Agent (RECOMMENDED — uses a more capable model than gameplay)
-# Without these, the creator falls back to VENICE_* settings and the 7B model,
+# Without these, the creator falls back to LLM_* settings and whatever model
 # which cannot reliably generate game files. Set at least CREATOR_MODEL.
 # CREATOR_API_KEY=sk-...           # Required if using a different provider
 # CREATOR_BASE_URL=https://api.openai.com/v1
@@ -1383,9 +1383,9 @@ Build in this order. Each step should produce working, tested code before moving
 - Update `.env.example` with `CREATOR_*` variables
 - Write `tests/test_creator_config.py`:
   - Test that `load_creator_config()` reads `CREATOR_*` env vars
-  - Test fallback to `VENICE_*` env vars
+  - Test fallback to `LLM_*` env vars
   - Test that a warning is issued when the resolved model is the 7B gameplay model
-  - Test that `ValueError` is raised when no API key is found (no `CREATOR_API_KEY` or `VENICE_API_KEY`)
+  - Test that `ValueError` is raised when no API key is found (no `CREATOR_API_KEY` or `LLM_API_KEY`)
   - Test `is_small_model` property returns True for the 7B model and False for other models
 
 ### Step 3: Prompt templates

@@ -21,7 +21,7 @@ TheAct addresses all of these by designing from the ground up for small model co
 
 ### 2.1 Small Model First
 
-**Requirement:** Must work with 7B-class thinking models (specifically `olafangensan-glm-4.7-flash-heretic` via Venice AI).
+**Requirement:** Must work with 7B-class thinking models (e.g. local models, or equivalent small models from other providers).
 
 **Rationale:** The user wants games that can run on local hardware or cheap inference endpoints. This rules out relying on GPT-4-class capabilities.
 

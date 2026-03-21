@@ -10,9 +10,9 @@ from dataclasses import dataclass
 class LLMConfig:
     """Global LLM configuration. One instance per game session."""
 
-    base_url: str = "https://api.venice.ai/api/v1"
+    base_url: str = "https://api.openai.com/v1"
     api_key: str = ""  # loaded from env
-    model: str = "olafangensan-glm-4.7-flash-heretic"
+    model: str = ""
     default_temperature: float = 1.0
     default_max_tokens: int = 1500
     context_limit: int = 8192  # model's context window size
@@ -68,15 +68,15 @@ SUMMARIZER_CONFIG = AgentLLMConfig(
 
 def load_llm_config() -> LLMConfig:
     """Load LLM configuration from environment variables."""
-    api_key = os.environ.get("VENICE_API_KEY", "")
+    api_key = os.environ.get("LLM_API_KEY", "")
     if not api_key:
         raise ValueError(
-            "VENICE_API_KEY environment variable is required. "
+            "LLM_API_KEY environment variable is required. "
             "Set it in your .env file or shell environment."
         )
 
     return LLMConfig(
-        base_url=os.environ.get("VENICE_BASE_URL", "https://api.venice.ai/api/v1"),
+        base_url=os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1"),
         api_key=api_key,
-        model=os.environ.get("VENICE_MODEL", "olafangensan-glm-4.7-flash-heretic"),
+        model=os.environ.get("LLM_MODEL", ""),
     )

@@ -159,7 +159,7 @@ docs/
 
 **Sections:**
 
-1. **Prerequisites** — Python 3.11+, uv, a Venice AI API key
+1. **Prerequisites** — Python 3.11+, uv, an LLM API key
 2. **Install** — `uv sync`, `.env` setup
 3. **Verify** — `uv run python scripts/test_llm.py`
 4. **Play (CLI)** — `uv run python -m theact`, select Lost Island, walk through a turn

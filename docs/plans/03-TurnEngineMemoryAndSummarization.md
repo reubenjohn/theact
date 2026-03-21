@@ -1481,7 +1481,7 @@ tests/
 Integration test for the turn engine.
 Run: uv run python scripts/test_turn.py
 
-Requires VENICE_API_KEY in environment or .env file.
+Requires LLM_API_KEY in environment or .env file.
 Runs 3 turns against the live API with the lost-island game.
 """
 import asyncio

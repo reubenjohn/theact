@@ -6,7 +6,7 @@ This phase builds the LLM calling infrastructure that every agent in TheAct will
 
 - **Async support** -- post-turn processing (memory updates + game state check) runs in parallel via `asyncio.gather`
 - **Streaming** -- tokens yield as they arrive so the CLI (Phase 04) can display them in real time
-- **Thinking token separation** -- Venice AI's thinking model produces reasoning tokens before the actual response; we capture both streams separately
+- **Thinking token separation** -- The thinking model produces reasoning tokens before the actual response; we capture both streams separately
 - **YAML-based structured output** -- small models cannot reliably produce JSON schema output; we ask for YAML in fenced blocks and parse it ourselves
 - **Retry with feedback** -- when YAML parsing fails, we retry with the parse error so the model can self-correct
 - **Token estimation** -- simple character-based estimation for context budget decisions in Phase 03
@@ -64,7 +64,7 @@ The layers, bottom to top:
         |
         v
 +----------------------------------------------------------+
-|  Venice AI  (api.venice.ai/api/v1)                       |
+|  OpenAI-compatible endpoint                       |
 +----------------------------------------------------------+
 ```
 
@@ -84,7 +84,7 @@ from typing import Optional
 @dataclass(frozen=True)
 class LLMConfig:
     """Global LLM configuration. One instance per game session."""
-    base_url: str = "https://api.venice.ai/api/v1"
+    base_url: str = "https://api.openai.com/v1"
     api_key: str = ""  # loaded from env
     model: str = "olafangensan-glm-4.7-flash-heretic"
     default_temperature: float = 1.0
@@ -147,7 +147,7 @@ _client: AsyncOpenAI | None = None
 
 
 def get_client(config: LLMConfig) -> AsyncOpenAI:
-    """Return a singleton AsyncOpenAI client configured for Venice AI."""
+    """Return a singleton AsyncOpenAI client configured ."""
     # NOTE: Once created, the singleton ignores subsequent configs.
     # Call reset_client() first if the config has changed.
     global _client
@@ -518,9 +518,9 @@ async def complete_structured(messages, llm_config, agent_config, yaml_hint=""):
 
 ## 5. Streaming
 
-### 5.1 How Venice AI Returns Thinking Tokens
+### 5.1 How Thinking Tokens Are Returned
 
-Venice AI's OpenAI-compatible endpoint for thinking models returns thinking/reasoning tokens as part of the streamed response. Since the official `openai` library (v2.29.0) does not have a dedicated `reasoning_content` field on `ChoiceDelta`, Venice AI delivers thinking tokens through one of these mechanisms (we must handle both):
+The OpenAI-compatible endpoint for thinking models returns thinking/reasoning tokens as part of the streamed response. Since the official `openai` library (v2.29.0) does not have a dedicated `reasoning_content` field on `ChoiceDelta`, The provider delivers thinking tokens through one of these mechanisms (we must handle both):
 
 1. **`reasoning_content` as an extra field on the delta dict** -- accessible via `getattr(chunk.choices[0].delta, "reasoning_content", None)` or through the raw dict representation `chunk.model_extra` / `chunk.choices[0].delta.model_extra`.
 2. **Thinking content wrapped in `<think>...</think>` tags within the regular `content` field** -- some OpenAI-compatible endpoints embed thinking this way.
@@ -534,7 +534,7 @@ tags across boundaries. The implementation should buffer the last few characters
 when they could be the start of a tag (`<`, `<t`, `<th`, etc.) and flush them
 on the next chunk. For v1, a simpler approach: if a chunk ends with `<` or
 starts with partial tag text, buffer it. The implementation may need to handle
-this pragmatically based on observed Venice AI behavior.
+this pragmatically based on observed provider behavior.
 
 ```python
 from typing import AsyncIterator
@@ -822,7 +822,7 @@ The retry logic is deliberately kept simple. Only YAML parse failures are retrie
 We use a simple character-based heuristic. For English text with typical LLM tokenizers, the ratio is approximately 1 token per 4 characters. This is imprecise but sufficient for context budget management (deciding when to summarize history, how much context to include, etc.).
 
 We do NOT add `tiktoken` as a dependency. Reasons:
-- The Venice AI model uses its own tokenizer, not OpenAI's
+- The model uses its own tokenizer, not OpenAI's
 - Exact counts are not needed -- we only need rough estimates for budget decisions
 - Keeps dependencies minimal
 
@@ -887,9 +887,9 @@ The context limit is configured on `LLMConfig.context_limit` (default 8192). Pha
 
 | Setting | Source | Default |
 |---|---|---|
-| `base_url` | `VENICE_BASE_URL` env var or constructor | `https://api.venice.ai/api/v1` |
-| `api_key` | `VENICE_API_KEY` env var (required) | -- |
-| `model` | `VENICE_MODEL` env var or constructor | `olafangensan-glm-4.7-flash-heretic` |
+| `base_url` | `LLM_BASE_URL` env var or constructor | `https://api.openai.com/v1` |
+| `api_key` | `LLM_API_KEY` env var (required) | -- |
+| `model` | `LLM_MODEL` env var or constructor | `olafangensan-glm-4.7-flash-heretic` |
 | `default_temperature` | constructor | `1.0` |
 | `default_max_tokens` | constructor | `900` |
 | Per-agent `temperature` | `AgentLLMConfig` | Falls back to `default_temperature` |
@@ -905,17 +905,17 @@ from theact.llm.config import LLMConfig
 
 def load_llm_config() -> LLMConfig:
     """Load LLM configuration from environment variables."""
-    api_key = os.environ.get("VENICE_API_KEY", "")
+    api_key = os.environ.get("LLM_API_KEY", "")
     if not api_key:
         raise ValueError(
-            "VENICE_API_KEY environment variable is required. "
+            "LLM_API_KEY environment variable is required. "
             "Set it in your .env file or shell environment."
         )
 
     return LLMConfig(
-        base_url=os.environ.get("VENICE_BASE_URL", "https://api.venice.ai/api/v1"),
+        base_url=os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1"),
         api_key=api_key,
-        model=os.environ.get("VENICE_MODEL", "olafangensan-glm-4.7-flash-heretic"),
+        model=os.environ.get("LLM_MODEL", "olafangensan-glm-4.7-flash-heretic"),
     )
 ```
 
@@ -986,14 +986,14 @@ Write `scripts/test_llm.py` (see Section 10).
 
 ### 10.1 Test Script (`scripts/test_llm.py`)
 
-A standalone script that exercises all the key functionality against the live Venice AI endpoint:
+A standalone script that exercises all the key functionality against the live API endpoint:
 
 ```python
 """
 Smoke test for the LLM client layer.
 Run: uv run python scripts/test_llm.py
 
-Requires VENICE_API_KEY in environment or .env file.
+Requires LLM_API_KEY in environment or .env file.
 """
 import asyncio
 from dotenv import load_dotenv
@@ -1158,7 +1158,7 @@ These can be plain pytest tests that don't hit the network:
 
 ### 10.4 Live Testing & Regression Capture
 
-After the smoke test (`scripts/test_llm.py`) passes, perform deeper live API validation. The goal is to discover how the real Venice AI endpoint behaves and lock down edge cases as automated tests.
+After the smoke test (`scripts/test_llm.py`) passes, perform deeper live API validation. The goal is to discover how the real API endpoint behaves and lock down edge cases as automated tests.
 
 **Step 1 — Exploratory testing against the real API:**
 - Run `scripts/test_llm.py` and carefully inspect output. Pay attention to:

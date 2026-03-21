@@ -81,7 +81,7 @@ async def process_stream(
     """Process an OpenAI streaming response, separating thinking from content.
 
     Yields StreamChunk objects. Handles two strategies for thinking tokens:
-    1. reasoning_content in model_extra (Venice AI native)
+    1. reasoning_content in model_extra (some providers)
     2. <think>...</think> tags in the content field
     """
     in_think_tag = False

@@ -2,7 +2,7 @@
 Smoke test for the LLM client layer.
 Run: uv run python scripts/test_llm.py
 
-Requires VENICE_API_KEY in environment or .env file.
+Requires LLM_API_KEY in environment or .env file.
 """
 
 import asyncio

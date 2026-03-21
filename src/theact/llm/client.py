@@ -1,4 +1,4 @@
-"""Thin wrapper around AsyncOpenAI — singleton client for Venice AI."""
+"""Thin wrapper around AsyncOpenAI — singleton client for any OpenAI-compatible API."""
 
 from __future__ import annotations
 
@@ -10,7 +10,10 @@ _client: AsyncOpenAI | None = None
 
 
 def get_client(config: LLMConfig) -> AsyncOpenAI:
-    """Return a singleton AsyncOpenAI client configured for Venice AI.
+    """Return a singleton AsyncOpenAI client.
+
+    Works with any OpenAI-compatible API endpoint (OpenAI, OpenRouter,
+    Together AI, local servers like vLLM/Ollama, etc.).
 
     NOTE: Once created, the singleton ignores subsequent configs.
     Call reset_client() first if the config has changed.

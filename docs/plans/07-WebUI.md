@@ -479,7 +479,7 @@ Each call to `append_text` updates the element's `.content` property. NiceGUI de
 
 ### 5.3 Batching Consideration
 
-> **NiceGUI internals note:** NiceGUI already coalesces multiple property updates that occur within the same asyncio event loop iteration into a single WebSocket message. Since `async for event in engine.play_turn()` yields tokens from an async generator, and each token triggers an `await` (giving the event loop a chance to flush), NiceGUI will typically send one WebSocket message per token. This is fine for a remote API like Venice AI, which streams tokens at ~20-50/second -- well within browser rendering capacity.
+> **NiceGUI internals note:** NiceGUI already coalesces multiple property updates that occur within the same asyncio event loop iteration into a single WebSocket message. Since `async for event in engine.play_turn()` yields tokens from an async generator, and each token triggers an `await` (giving the event loop a chance to flush), NiceGUI will typically send one WebSocket message per token. This is fine for a remote API like a streaming API, which streams tokens at ~20-50/second -- well within browser rendering capacity.
 >
 > However, if using a very fast local model (hundreds of tokens/second), the rate may exceed what is comfortable. The batching below is a safeguard for that case. **Start without batching** (simpler code) and add it only if profiling shows jank with a specific model.
 

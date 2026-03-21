@@ -4,7 +4,7 @@
 
 TheAct is a programmatically-driven text RPG engine designed to work with small language models (7B-class thinking models). It is NOT an agent framework — the turn logic is entirely orchestrated by code, with each LLM call doing exactly one focused task.
 
-The system uses Venice AI's OpenAI-compatible API with the model `olafangensan-glm-4.7-flash-heretic`. Every design decision optimizes for small model reliability.
+The system uses any OpenAI-compatible API endpoint — AI, OpenAI, OpenRouter, Together AI, Groq, Venice, or a local server (Ollama/vLLM). Every design decision optimizes for small model reliability.
 
 ## Critical Constraints
 
@@ -90,7 +90,7 @@ uv run scripts/dev_server.py stop               # Stop dev server
 uv run scripts/dev_server.py restart --port 8111 # Restart dev server
 uv run scripts/dev_server.py status             # Check if dev server is running
 
-# LLM testing (requires VENICE_API_KEY in .env)
+# LLM testing (requires LLM_API_KEY in .env)
 uv run python scripts/test_llm.py                              # Smoke test LLM client
 uv run python scripts/diagnose_agent.py narrator "I look around"  # Test one agent
 uv run python scripts/playtest.py --game lost-island --turns 20   # Autonomous playtest
@@ -104,7 +104,7 @@ uv run python scripts/ab_test.py --variant-b prompts_v2.py --runs 3  # A/B test
 Requires a `.env` file (see `docs/getting-started.md` for full setup):
 ```bash
 cp .env.example .env
-# Edit .env with your Venice AI API key
+# Edit .env with your API key and model settings
 ```
 
 Web UI browser tests require Chromium: `npx -y @playwright/test@latest install chromium`

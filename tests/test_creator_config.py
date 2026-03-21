@@ -10,9 +10,9 @@ from theact.creator.config import CreatorLLMConfig, _GAMEPLAY_MODEL, load_creato
 class TestCreatorLLMConfig:
     def test_defaults(self):
         config = CreatorLLMConfig()
-        assert config.base_url == "https://api.venice.ai/api/v1"
+        assert config.base_url == "https://api.openai.com/v1"
         assert config.api_key == ""
-        assert config.model == "olafangensan-glm-4.7-flash-heretic"
+        assert config.model == ""
         assert config.temperature == 0.7
         assert config.max_tokens == 4096
         assert config.proposal_max_tokens == 1500
@@ -50,7 +50,7 @@ class TestCreatorLLMConfig:
 class TestLoadCreatorConfig:
     def test_missing_api_key_raises(self, monkeypatch):
         monkeypatch.delenv("CREATOR_API_KEY", raising=False)
-        monkeypatch.delenv("VENICE_API_KEY", raising=False)
+        monkeypatch.delenv("LLM_API_KEY", raising=False)
         with pytest.raises(ValueError, match="No API key found"):
             load_creator_config()
 
@@ -58,47 +58,47 @@ class TestLoadCreatorConfig:
         monkeypatch.setenv("CREATOR_API_KEY", "creator-key")
         monkeypatch.setenv("CREATOR_BASE_URL", "http://creator-host")
         monkeypatch.setenv("CREATOR_MODEL", "gpt-4o")
-        monkeypatch.delenv("VENICE_API_KEY", raising=False)
-        monkeypatch.delenv("VENICE_BASE_URL", raising=False)
-        monkeypatch.delenv("VENICE_MODEL", raising=False)
+        monkeypatch.delenv("LLM_API_KEY", raising=False)
+        monkeypatch.delenv("LLM_BASE_URL", raising=False)
+        monkeypatch.delenv("LLM_MODEL", raising=False)
 
         config = load_creator_config()
         assert config.api_key == "creator-key"
         assert config.base_url == "http://creator-host"
         assert config.model == "gpt-4o"
 
-    def test_falls_back_to_venice_vars(self, monkeypatch):
+    def test_falls_back_to_llm_vars(self, monkeypatch):
         monkeypatch.delenv("CREATOR_API_KEY", raising=False)
         monkeypatch.delenv("CREATOR_BASE_URL", raising=False)
         monkeypatch.delenv("CREATOR_MODEL", raising=False)
-        monkeypatch.setenv("VENICE_API_KEY", "venice-key")
-        monkeypatch.setenv("VENICE_BASE_URL", "http://venice-host")
-        monkeypatch.setenv("VENICE_MODEL", "gpt-4o")
+        monkeypatch.setenv("LLM_API_KEY", "llm-key")
+        monkeypatch.setenv("LLM_BASE_URL", "http://llm-host")
+        monkeypatch.setenv("LLM_MODEL", "gpt-4o")
 
         config = load_creator_config()
-        assert config.api_key == "venice-key"
-        assert config.base_url == "http://venice-host"
+        assert config.api_key == "llm-key"
+        assert config.base_url == "http://llm-host"
         assert config.model == "gpt-4o"
 
     def test_creator_vars_take_precedence(self, monkeypatch):
         monkeypatch.setenv("CREATOR_API_KEY", "creator-key")
-        monkeypatch.setenv("VENICE_API_KEY", "venice-key")
+        monkeypatch.setenv("LLM_API_KEY", "llm-key")
         monkeypatch.setenv("CREATOR_MODEL", "gpt-4o")
-        monkeypatch.setenv("VENICE_MODEL", "other-model")
+        monkeypatch.setenv("LLM_MODEL", "other-model")
         monkeypatch.delenv("CREATOR_BASE_URL", raising=False)
-        monkeypatch.delenv("VENICE_BASE_URL", raising=False)
+        monkeypatch.delenv("LLM_BASE_URL", raising=False)
 
         config = load_creator_config()
         assert config.api_key == "creator-key"
         assert config.model == "gpt-4o"
 
     def test_warns_on_small_model(self, monkeypatch):
-        monkeypatch.setenv("VENICE_API_KEY", "test-key")
+        monkeypatch.setenv("LLM_API_KEY", "test-key")
         monkeypatch.delenv("CREATOR_API_KEY", raising=False)
         monkeypatch.delenv("CREATOR_MODEL", raising=False)
         monkeypatch.delenv("CREATOR_BASE_URL", raising=False)
-        monkeypatch.delenv("VENICE_MODEL", raising=False)
-        monkeypatch.delenv("VENICE_BASE_URL", raising=False)
+        monkeypatch.delenv("LLM_MODEL", raising=False)
+        monkeypatch.delenv("LLM_BASE_URL", raising=False)
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -110,10 +110,10 @@ class TestLoadCreatorConfig:
     def test_no_warning_for_large_model(self, monkeypatch):
         monkeypatch.setenv("CREATOR_API_KEY", "test-key")
         monkeypatch.setenv("CREATOR_MODEL", "gpt-4o")
-        monkeypatch.delenv("VENICE_API_KEY", raising=False)
+        monkeypatch.delenv("LLM_API_KEY", raising=False)
         monkeypatch.delenv("CREATOR_BASE_URL", raising=False)
-        monkeypatch.delenv("VENICE_BASE_URL", raising=False)
-        monkeypatch.delenv("VENICE_MODEL", raising=False)
+        monkeypatch.delenv("LLM_BASE_URL", raising=False)
+        monkeypatch.delenv("LLM_MODEL", raising=False)
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")

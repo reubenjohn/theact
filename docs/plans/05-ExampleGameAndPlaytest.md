@@ -881,7 +881,7 @@ No new packages are required beyond what Phases 01-04 already provide:
 - `pydantic` -- used for config and log data models
 - `pyyaml` -- used for report data files
 
-The playtest framework reuses all existing infrastructure. The only "new" LLM usage is the player agent, which calls the same `complete()` function from Phase 02 with the same Venice AI endpoint and model.
+The playtest framework reuses all existing infrastructure. The only "new" LLM usage is the player agent, which calls the same `complete()` function from Phase 02 with the same API endpoint and model.
 
 Standard library modules used:
 

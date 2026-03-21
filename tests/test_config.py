@@ -17,9 +17,9 @@ from theact.llm.config import (
 class TestLLMConfig:
     def test_defaults(self):
         config = LLMConfig()
-        assert config.base_url == "https://api.venice.ai/api/v1"
+        assert config.base_url == "https://api.openai.com/v1"
         assert config.api_key == ""
-        assert config.model == "olafangensan-glm-4.7-flash-heretic"
+        assert config.model == ""
         assert config.default_temperature == 1.0
         assert config.default_max_tokens == 1500
         assert config.context_limit == 8192
@@ -87,23 +87,23 @@ class TestAgentDefaults:
 
 class TestLoadLLMConfig:
     def test_missing_api_key_raises(self, monkeypatch):
-        monkeypatch.delenv("VENICE_API_KEY", raising=False)
-        with pytest.raises(ValueError, match="VENICE_API_KEY"):
+        monkeypatch.delenv("LLM_API_KEY", raising=False)
+        with pytest.raises(ValueError, match="LLM_API_KEY"):
             load_llm_config()
 
     def test_loads_from_env(self, monkeypatch):
-        monkeypatch.setenv("VENICE_API_KEY", "test-key-123")
-        monkeypatch.delenv("VENICE_BASE_URL", raising=False)
-        monkeypatch.delenv("VENICE_MODEL", raising=False)
+        monkeypatch.setenv("LLM_API_KEY", "test-key-123")
+        monkeypatch.delenv("LLM_BASE_URL", raising=False)
+        monkeypatch.delenv("LLM_MODEL", raising=False)
         config = load_llm_config()
         assert config.api_key == "test-key-123"
-        assert config.base_url == "https://api.venice.ai/api/v1"
-        assert config.model == "olafangensan-glm-4.7-flash-heretic"
+        assert config.base_url == "https://api.openai.com/v1"
+        assert config.model == ""
 
     def test_custom_env_vars(self, monkeypatch):
-        monkeypatch.setenv("VENICE_API_KEY", "my-key")
-        monkeypatch.setenv("VENICE_BASE_URL", "http://localhost:1234")
-        monkeypatch.setenv("VENICE_MODEL", "custom-model")
+        monkeypatch.setenv("LLM_API_KEY", "my-key")
+        monkeypatch.setenv("LLM_BASE_URL", "http://localhost:1234")
+        monkeypatch.setenv("LLM_MODEL", "custom-model")
         config = load_llm_config()
         assert config.api_key == "my-key"
         assert config.base_url == "http://localhost:1234"

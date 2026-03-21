@@ -150,7 +150,7 @@ uv run python main.py
 This calls `asyncio.run(cli.main())`, which:
 
 1. Loads `.env` (dotenv)
-2. Validates that `VENICE_API_KEY` is set
+2. Validates that `LLM_API_KEY` is set
 3. Prints the title banner
 4. Enters the main menu
 

@@ -71,7 +71,7 @@ class Application:
         except ValueError as e:
             self.console.print(f"\n{e}", style=ERROR_STYLE)
             self.console.print(
-                "Create a .env file with VENICE_API_KEY=your_key_here",
+                "Create a .env file with LLM_API_KEY=your_key_here",
                 style=STATUS_STYLE,
             )
             return None

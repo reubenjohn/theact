@@ -36,7 +36,7 @@ All modules live in `src/theact/creator/`.
 | `writer.py` | Writes validated files to disk |
 | `display.py` | Rich-formatted display of proposals, files, errors |
 | `prompts.py` | All prompt templates (proposal, generation, fix, revision) |
-| `config.py` | LLM config with `CREATOR_*`/`VENICE_*` env var fallback |
+| `config.py` | LLM config with `CREATOR_*`/`LLM_*` env var fallback |
 
 ## Two-Phase LLM Interaction
 
@@ -108,11 +108,11 @@ There is no code-side slugification — the LLM is prompted to produce a valid s
 
 | Env var | Fallback | Default |
 |---|---|---|
-| `CREATOR_BASE_URL` | `VENICE_BASE_URL` | `https://api.venice.ai/api/v1` |
-| `CREATOR_API_KEY` | `VENICE_API_KEY` | (required) |
-| `CREATOR_MODEL` | `VENICE_MODEL` | `olafangensan-glm-4.7-flash-heretic` |
+| `CREATOR_BASE_URL` | `LLM_BASE_URL` | `https://api.openai.com/v1` |
+| `CREATOR_API_KEY` | `LLM_API_KEY` | (required) |
+| `CREATOR_MODEL` | `LLM_MODEL` | (none) |
 
-A warning is printed if the resolved model is the 7B default (`olafangensan-glm-4.7-flash-heretic`), since game creation benefits from a larger model's ability to produce consistent, well-structured YAML across multiple files.
+A warning is printed if the resolved model is the 7B gameplay model (`olafangensan-glm-4.7-flash-heretic`), since game creation benefits from a larger model's ability to produce consistent, well-structured YAML across multiple files.
 
 ## See Also
 

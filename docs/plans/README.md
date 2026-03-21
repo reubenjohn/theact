@@ -119,9 +119,9 @@ This is important. Your context window will degrade if you try to hold everythin
 
 **Phase 02** — append:
 ```
-After implementation, run the smoke test against the live Venice AI endpoint:
+After implementation, run the smoke test against the live API endpoint:
   uv run python scripts/test_llm.py
-This requires VENICE_API_KEY in .env. Verify thinking tokens appear in output.
+This requires LLM_API_KEY in .env. Verify thinking tokens appear in output.
 ```
 
 **Phase 03** — append:
@@ -191,7 +191,7 @@ When implementing edit_and_replay, reload BOTH prompts.py AND context.py.
 **Phase 11** — append:
 ```
 This phase is iterative. Each step modifies prompts or parsing code, then
-validates against the live model. You MUST have VENICE_API_KEY in .env.
+validates against the live model. You MUST have LLM_API_KEY in .env.
 
 After each prompt change:
   1. Use the turn debugger to replay the affected agent (3+ times)

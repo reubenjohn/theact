@@ -8,7 +8,7 @@
 git clone https://github.com/reubenjohn/theact.git
 cd theact
 uv sync
-cp .env.example .env    # Add your VENICE_API_KEY
+cp .env.example .env    # Add your LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
 ```
 
 Install the pre-commit formatter:

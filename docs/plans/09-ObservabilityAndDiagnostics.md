@@ -1185,7 +1185,7 @@ uv run pytest tests/ -v
 # Run lint/format
 uv run prek run --all-files
 
-# If VENICE_API_KEY is available, run a short playtest with debug + call logging
+# If LLM_API_KEY is available, run a short playtest with debug + call logging
 uv run python scripts/playtest.py --game lost-island --turns 3 --debug
 ```
 

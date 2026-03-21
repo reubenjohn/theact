@@ -22,7 +22,7 @@ No LLM calls, no CLI, no agents. Just the data layer and the versioning layer.
 
 ```
 theact/
-  .env                      # VENICE_API_KEY, model config
+  .env                      # LLM_API_KEY, model config
   .env.example
   .gitignore
   pyproject.toml

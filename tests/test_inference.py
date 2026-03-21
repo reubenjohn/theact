@@ -299,7 +299,7 @@ def make_stream_chunks(specs: list[dict]) -> list[FakeStreamChunk]:
 
 def _make_fake_request() -> httpx.Request:
     """Create a fake httpx.Request for constructing openai exceptions."""
-    return httpx.Request("POST", "https://api.venice.ai/api/v1/chat/completions")
+    return httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
 
 
 def _make_fake_response(
