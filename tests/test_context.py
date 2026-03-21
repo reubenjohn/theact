@@ -249,8 +249,8 @@ class TestBuildNarratorMessages:
         messages = build_narrator_messages(lost_island_game, "What now?", llm_config)
         user = messages[1]["content"]
         assert "new chapter" in user.lower()
-        # Flag should be cleared after building messages
-        assert not lost_island_game.state.chapter_just_advanced
+        # Flag is NOT cleared by the builder — run_turn clears it after building
+        assert lost_island_game.state.chapter_just_advanced
 
 
 # ---------------------------------------------------------------------------

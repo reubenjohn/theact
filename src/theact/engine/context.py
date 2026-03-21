@@ -47,13 +47,15 @@ def get_recent_conversation(
     """Get the last *max_turns* turns of conversation (all entries within those turns)."""
     if not conversation:
         return []
-    turns_seen: list[int] = []
+    turns_seen: set[int] = set()
+    turn_order: list[int] = []
     for entry in reversed(conversation):
         if entry.turn not in turns_seen:
-            turns_seen.append(entry.turn)
+            turns_seen.add(entry.turn)
+            turn_order.append(entry.turn)
         if len(turns_seen) >= max_turns:
             break
-    cutoff_turn = turns_seen[-1] if turns_seen else 0
+    cutoff_turn = turn_order[-1] if turn_order else 0
     return [e for e in conversation if e.turn >= cutoff_turn]
 
 
@@ -192,7 +194,7 @@ def build_narrator_messages(
         if game.state.rolling_summary:
             user_parts_trimmed.append(f"Story so far: {game.state.rolling_summary}")
         if recent_text:
-            user_parts_trimmed.append(f"Recent:\n{recent_text}")
+            user_parts_trimmed.append(f"Recent conversation:\n{recent_text}")
         if game.state.chapter_just_advanced:
             user_parts_trimmed.append(
                 "The previous chapter is complete. Begin the new chapter "
@@ -203,9 +205,6 @@ def build_narrator_messages(
             {"role": "system", "content": system},
             {"role": "user", "content": "\n\n".join(user_parts_trimmed)},
         ]
-
-    # Reset chapter transition flag after building messages
-    game.state.chapter_just_advanced = False
 
     return messages
 

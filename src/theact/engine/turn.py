@@ -38,7 +38,7 @@ from theact.io.save_manager import (
     save_state,
     save_summaries,
 )
-from theact.llm.call_log import LLMCallLog
+from theact.llm.call_log import LLMCallLog, LLMCallRecord
 from theact.llm.config import LLMConfig
 from theact.llm.tokens import estimate_tokens
 from theact.models.chapter import ChapterSummary
@@ -85,12 +85,16 @@ async def run_turn(
     new_turn = game.state.turn + 1
     entries: list[ConversationEntry] = []
     diag = DiagnosticsWriter(game.save_path, new_turn) if debug else None
-    diag_records: list = []
+    diag_records: list[LLMCallRecord] = []
 
     # -- Step 1: Narrator ------------------------------------------------
 
     if diag:
         narrator_msgs = build_narrator_messages(game, player_input, llm_config)
+
+    # Reset chapter transition flag after narrator messages are built
+    # (must happen after build_narrator_messages reads it, but before run_narrator)
+    game.state.chapter_just_advanced = False
 
     async def narrator_token_cb(token: str, is_thinking: bool) -> None:
         if on_token:
@@ -318,7 +322,7 @@ async def run_turn(
 
     # -- Step 6: Rolling summary (if needed) -----------------------------
 
-    await _maybe_update_rolling_summary(
+    summary_updated = await _maybe_update_rolling_summary(
         game, llm_config, call_log=call_log, turn=new_turn
     )
 
@@ -330,8 +334,9 @@ async def run_turn(
     # -- Step 7: Persist + Git commit ------------------------------------
 
     save_state(game.save_path, game.state)
-    for char_id, mem in game.memories.items():
-        save_memory(game.save_path, mem)
+    for char_id in memory_char_ids:
+        if char_id in game.memories:
+            save_memory(game.save_path, game.memories[char_id])
 
     commit_summary = narrator_output.narration[:60].replace("\n", " ")
     commit_turn(game.save_path, new_turn, commit_summary)
@@ -344,7 +349,7 @@ async def run_turn(
         game_state=state_result,
         chapter_advanced=chapter_advanced,
         new_chapter=new_chapter,
-        summary_updated=False,
+        summary_updated=summary_updated,
     )
 
 
@@ -414,11 +419,13 @@ async def _maybe_update_rolling_summary(
     llm_config: LLMConfig,
     call_log: LLMCallLog | None = None,
     turn: int = 0,
-) -> None:
+) -> bool:
     """Trigger rolling summarization if conversation exceeds token budget.
 
     Only counts entries added since the last summarization to avoid
     triggering on every turn after the first summary.
+
+    Returns True if the summary was updated.
     """
     SUMMARY_THRESHOLD = 1500  # tokens of unsummarized conversation
     KEEP_RECENT = 4  # number of recent turns to keep verbatim
@@ -431,21 +438,20 @@ async def _maybe_update_rolling_summary(
     conv_tokens = estimate_tokens(conv_text)
 
     if conv_tokens <= SUMMARY_THRESHOLD:
-        return
+        return False
 
     # Find the cutoff: keep the last KEEP_RECENT turns
-    turns_seen: list[int] = []
+    turns_seen: set[int] = set()
     cutoff_idx = len(game.conversation)
     for i in range(len(game.conversation) - 1, -1, -1):
         t = game.conversation[i].turn
-        if t not in turns_seen:
-            turns_seen.append(t)
+        turns_seen.add(t)
         if len(turns_seen) > KEEP_RECENT:
             cutoff_idx = i + 1
             break
 
     if cutoff_idx <= 0:
-        return
+        return False
 
     # The entries to summarize
     old_entries = game.conversation[:cutoff_idx]
@@ -463,3 +469,4 @@ async def _maybe_update_rolling_summary(
     # Record which turn we summarized up to
     cutoff_turn = max(e.turn for e in old_entries)
     game.state.last_summarized_turn = cutoff_turn
+    return True

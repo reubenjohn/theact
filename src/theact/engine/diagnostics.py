@@ -8,6 +8,7 @@ already produced and writes it to disk for offline inspection.
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from pathlib import Path
 
 import yaml
@@ -77,24 +78,9 @@ class DiagnosticsWriter:
 
         # Write call record
         if call_record is not None:
-            record_data = {
-                "timestamp": call_record.timestamp,
-                "agent": call_record.agent,
-                "turn": call_record.turn,
-                "prompt_tokens": call_record.prompt_tokens,
-                "thinking_tokens": call_record.thinking_tokens,
-                "content_tokens": call_record.content_tokens,
-                "latency_ms": call_record.latency_ms,
-                "finish_reason": call_record.finish_reason,
-                "parse_result": call_record.parse_result,
-                "parse_attempts": call_record.parse_attempts,
-                "retry_count": call_record.retry_count,
-                "temperature": call_record.temperature,
-                "max_tokens": call_record.max_tokens,
-            }
             with open(agent_dir / "call_record.yaml", "w") as f:
                 yaml.dump(
-                    record_data,
+                    asdict(call_record),
                     f,
                     default_flow_style=False,
                     allow_unicode=True,
