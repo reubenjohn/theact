@@ -1,0 +1,92 @@
+site_name: TheAct
+site_description: An AI-driven text-based RPG engine for small language models
+site_url: https://reubenjohn.github.io/theact
+repo_url: https://github.com/reubenjohn/theact
+repo_name: reubenjohn/theact
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - minify:
+      minify_html: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets:
+      base_path: ['.']
+  - admonition
+  - pymdownx.details
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Guides:
+    - Getting Started: guides/getting-started.md
+    - Creating a Game: guides/creating-a-game.md
+    - Playtesting: guides/playtesting.md
+    - Prompt Iteration: guides/prompt-iteration.md
+  - Debugging & Testing:
+    - Debugging: guides/debugging.md
+    - Diagnostics: guides/diagnostics.md
+    - Golden Scenarios: guides/golden-scenarios.md
+    - A/B Testing: guides/ab-testing.md
+  - Architecture:
+    - Overview: design/architecture.md
+    - Agents: design/agents.md
+    - Data Model: design/data-model.md
+    - Memory & Summarization: design/memory-and-summarization.md
+    - Observability: design/observability.md
+    - Creator Agent: design/creator.md
+    - Turn Debugger: design/debugger.md
+  - Reference:
+    - Requirements & Rationale: requirements.md
+  - Plans:
+    - Overview: plans/README.md
+    - Phase 01 - Data Model: plans/01-DataModelAndProjectStructure.md
+    - Phase 02 - LLM Client: plans/02-LLMClientAndInference.md
+    - Phase 03 - Turn Engine: plans/03-TurnEngineMemoryAndSummarization.md
+    - Phase 04 - Rich CLI: plans/04-RichCLI.md
+    - Phase 05 - Example Game: plans/05-ExampleGameAndPlaytest.md
+    - Phase 06 - Game Creator: plans/06-GameCreationAgent.md
+    - Phase 07 - Web UI: plans/07-WebUI.md
+    - Phase 08 - Documentation: plans/08-Documentation.md
+    - Phase 09 - Observability: plans/09-ObservabilityAndDiagnostics.md
+    - Phase 10 - Save Versioning: plans/10-SaveVersioningAndTurnDebugger.md
+    - Phase 11 - Small Model Hardening: plans/11-SmallModelHardening.md
+  - Contributing: https://github.com/reubenjohn/theact/blob/main/CONTRIBUTING.md

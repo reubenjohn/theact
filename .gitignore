@@ -3,3 +3,5 @@
 __pycache__/
 saves/
 playtests/
+.playwright-mcp/
+site/
