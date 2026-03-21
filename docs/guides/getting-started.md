@@ -30,6 +30,22 @@ VENICE_API_KEY=your_key_here
 
 The default model (`olafangensan-glm-4.7-flash-heretic`) and endpoint are pre-configured. See [`.env.example`](../../.env.example) for optional overrides.
 
+### Custom data directory
+
+By default, game definitions live in `games/` and save files live in `saves/` relative to the project root. To store data elsewhere (e.g. a shared folder, a different drive, or outside the repo), set `THEACT_DATA_DIR` in your `.env`:
+
+```
+THEACT_DATA_DIR=/path/to/my/data
+```
+
+TheAct will look for `games/` and `saves/` inside that directory. Create the subfolders if they don't exist:
+
+```bash
+mkdir -p /path/to/my/data/games /path/to/my/data/saves
+```
+
+When `THEACT_DATA_DIR` is not set, the original behavior (data alongside the codebase) is preserved.
+
 ## Verify the LLM connection
 
 ```bash
