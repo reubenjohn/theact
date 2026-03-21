@@ -35,7 +35,7 @@ known_behaviors:
 
   - name: block_scalar_formatting
     description: "Model sometimes omits newline after | in block scalars"
-    impact: "key: |value instead of key: |\\n  value"
+    impact: "key: |value instead of key: |\n  value"
     mitigation: "repair_yaml_text fixes this pattern"
 
 experiments: []

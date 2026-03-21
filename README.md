@@ -1,72 +1,76 @@
 # TheAct
 
-An AI-driven text-based RPG engine designed for small language models.
+**An AI-driven text-based RPG engine designed for small language models.**
 
-TheAct programmatically orchestrates narrative turns using specialized agents — a narrator, individual character agents, memory managers, and game state evaluators — each making a single focused LLM call. This architecture enables compelling interactive fiction with 7B-class models that would struggle with traditional agent frameworks.
+TheAct is a programmatic turn engine -- not an agent framework -- where code orchestrates every step of gameplay. Each turn dispatches specialized agents (narrator, characters, memory, game state) that each make exactly one focused LLM call, keeping prompts tiny and reliable. The system runs on 7B-class thinking models, proving you don't need massive models for compelling interactive fiction.
+
+## Turn Pipeline
+
+```mermaid
+flowchart LR
+    A[Player Input] --> B[Context Assembly]
+    B --> C[Narrator Agent]
+    C --> D[Character Agents]
+    D --> E[Post-Turn Agents]
+    E --> F[Persist + Git Commit]
+
+    C -.- C1(streaming)
+    D -.- D1(sequential, streaming)
+    E -.- E1("parallel: memory + game state")
+```
+
+## Features
+
+- **Multiple AI characters** with distinct personalities, goals, and per-character memory
+- **Chapter-based story progression** with beats and completion criteria
+- **Git-based save versioning** -- unlimited undo, branching, history diff
+- **Autonomous playtesting** framework with quality scoring
+- **Interactive turn debugger** -- step through agents, edit prompts, replay
+- **Game creation agent** -- build new games through conversation
+- **CLI + Web UI** -- Rich terminal interface and NiceGUI browser client
 
 ## Quick Start
 
 ```bash
-# Install dependencies
 uv sync
-
-# Set up environment
-cp .env.example .env
-# Edit .env with your Venice AI API key
-
-# Verify LLM connection
-uv run python scripts/test_llm.py
-
-# Launch the game
-uv run python -m theact
+cp .env.example .env                 # Add your VENICE_API_KEY
+uv run python scripts/test_llm.py   # Verify LLM connection
+uv run python -m theact             # Play
 ```
 
-## How It Works
+## Documentation
 
-Each turn follows a fixed pipeline:
+| Guide | Path |
+|-------|------|
+| Getting Started | [docs/getting-started.md](docs/getting-started.md) |
+| Core Concepts | [docs/concepts.md](docs/concepts.md) |
+| Architecture | [docs/architecture/overview.md](docs/architecture/overview.md) |
+| Creating a Game | [docs/guides/creating-a-game.md](docs/guides/creating-a-game.md) |
+| Full Documentation | [docs/README.md](docs/README.md) |
 
-1. **Player** types an action
-2. **Narrator agent** describes what happens and decides which characters respond
-3. **Character agents** respond sequentially (each sees prior responses)
-4. **Post-turn agents** run in parallel: update each character's memory + check chapter progress
-5. **Save** all changes and commit to git (enabling unlimited undo)
+## Tech Stack
 
-The game definition lives in simple YAML files — world, characters (~60 words each), and chapters with story beats and completion criteria. A game creation agent can generate these from a concept description.
+- **Python 3.11** + uv
+- **Venice AI** (OpenAI-compatible) with small thinking models
+- **Pydantic v2** -- data models with strict validation
+- **PyYAML** -- all data files and structured LLM output
+- **GitPython** -- save versioning
+- **Rich** -- terminal UI
+- **NiceGUI** -- web UI (optional)
 
 ## Project Structure
 
 ```
 src/theact/
-  models/       # Pydantic data models
-  io/           # YAML I/O, save management
-  versioning/   # Git-based save versioning
-  llm/          # LLM client, streaming, structured output
-  engine/       # Turn orchestration, context assembly
-  agents/       # Narrator, character, memory, game state agents
-  cli/          # Rich terminal interface
-  playtest/     # Autonomous playtest framework
-  creator/      # Game creation agent
-  web/          # NiceGUI web interface
-
-games/          # Game definitions (templates)
-saves/          # Active game saves (gitignored)
-docs/plans/     # Detailed implementation plans
+  models/       Data models (Pydantic)
+  io/           YAML I/O, save manager
+  versioning/   Git-based save versioning
+  llm/          LLM client, streaming, structured output, call logging
+  engine/       Turn engine, context assembly
+  agents/       Narrator, character, memory, game state, summarizer
+  debugger/     Interactive turn debugger
+  cli/          Rich terminal interface
+  web/          NiceGUI web interface
+  playtest/     Autonomous playtest framework
+  creator/      Game creation agent
 ```
-
-## Documentation
-
-Start at [docs/README.md](docs/README.md) for the full index. Key entry points:
-
-- **Guides:** [Getting Started](docs/guides/getting-started.md) | [Creating a Game](docs/guides/creating-a-game.md) | [Playtesting](docs/guides/playtesting.md) | [Prompt Iteration](docs/guides/prompt-iteration.md)
-- **Design:** [Architecture](docs/design/architecture.md) | [Agents](docs/design/agents.md) | [Data Model](docs/design/data-model.md) | [Memory & Summarization](docs/design/memory-and-summarization.md)
-- **Reference:** [Requirements & Rationale](docs/requirements.md) | [Phase Plans](docs/plans/) | [CLAUDE.md](CLAUDE.md)
-
-## Tech Stack
-
-- **Python 3.11** with uv package manager
-- **Venice AI** (OpenAI-compatible endpoint) with small thinking models
-- **Pydantic v2** for data validation
-- **PyYAML** for all data files
-- **GitPython** for save versioning
-- **Rich** for terminal UI
-- **NiceGUI** for web UI (optional)

@@ -1,6 +1,6 @@
-# Debugging with the Turn Debugger
+# Debugging
 
-The turn debugger lets you step through a turn's agent calls one at a time, inspect the exact prompts and responses, edit prompts and replay without restarting, and capture test fixtures. It wraps individual agent calls — it does not modify the turn engine.
+The turn debugger lets you step through agent calls one at a time, inspect prompts and responses, edit prompts and replay without restarting, and capture test fixtures. It wraps agents directly — calling the same `run_narrator()`, `run_character()`, etc. that `run_turn()` uses — so there is no "debugger mode" that could mask bugs.
 
 ## Quick Start
 
@@ -8,38 +8,59 @@ The turn debugger lets you step through a turn's agent calls one at a time, insp
 uv run python scripts/debug_turn.py --save my-save --input "I look around."
 ```
 
-This loads the save, runs a single turn with the given input, and pauses before each agent call so you can inspect and intervene.
+This loads the game state from the specified save, then pauses before each agent call so you can inspect and interact.
 
 ## Interactive Commands
 
 | Command | Key | Description |
 |---------|-----|-------------|
-| Step | `s` | Execute the current agent call and pause at the next one |
-| Replay | `r` | Re-run the current agent call (same inputs, new LLM call) |
-| Edit | `e` | Reload prompts from disk and replay the current agent call |
-| Inspect | `i` | Show prompt (`p`), response (`r`), or call record (`c`) for the current step |
-| Skip | `k` | Skip the current agent call and move to the next one |
-| Continue | `c` | Run all remaining agent calls without pausing |
-| Fixture | `f` | Save the current step's prompt/response as a test fixture |
-| Compare | `m` | Diff the current response against the previous replay of the same step |
-| Quit | `q` | Abort the turn and exit |
+| Step | `s` | Execute current agent call, pause at next |
+| Replay | `r` | Re-run current agent (same inputs, new LLM call) |
+| Edit | `e` | Reload prompts from disk and replay |
+| Inspect | `i` | Show prompt (`p`), response (`r`), or call record (`c`) |
+| Skip | `k` | Skip current agent, move to next |
+| Continue | `c` | Run all remaining agents without pausing |
+| Fixture | `f` | Save prompt/response as test fixture |
+| Compare | `m` | Diff current response against previous replay |
+| Quit | `q` | Abort and exit |
 
 ## Workflow: Fixing a Prompt
 
-1. **Run the debugger** with the input that triggers the problem.
-2. **Step** (`s`) through agents until you reach the one producing bad output.
-3. **Inspect the prompt** — press `i` then `p` to see exactly what the model received. Check for bloated context, missing data, or unclear instructions.
-4. **Inspect the response** — press `i` then `r` to see the raw model output. Identify what went wrong (bad format, hallucination, missing content).
-5. **Edit the prompt** — open `src/theact/agents/prompts.py` in your editor. Change the template.
-6. **Reload and replay** — press `e`. The debugger reloads prompts from disk and re-runs the agent call with the updated template. No restart needed.
-7. **Compare** — press `m` to diff the new response against the old one.
-8. **Capture a fixture** — when the output looks right, press `f` to save the prompt/response pair as a test fixture for regression testing.
+```mermaid
+flowchart TD
+    A["Run debugger with\nproblem input"] --> B["Step to\nfailing agent"]
+    B --> C["Inspect prompt\n(i then p)"]
+    C --> D["Inspect response\n(i then r)"]
+    D --> E["Edit prompts.py\nin your editor"]
+    E --> F["Press 'e' to\nreload + replay"]
+    F --> G{"Output\ncorrect?"}
+    G -->|No| E
+    G -->|Yes| H["Compare (m)\nagainst old output"]
+    H --> I["Capture fixture (f)\nfor regression test"]
+```
 
-This keeps you in a tight edit-test loop without restarting the debugger or re-running earlier agents.
+## How Edit+Replay Works
+
+The debugger uses `importlib.reload()` to hot-reload prompt changes. It must reload both `prompts.py` and `context.py` because `context.py` imports constants at import time.
+
+The sequence on pressing `e`:
+
+1. User edits `src/theact/agents/prompts.py` in their editor
+2. Debugger reloads the prompts module
+3. Debugger reloads the context module (picks up new constants)
+4. Agent call replays with the updated prompt
+
+This gives a tight edit-test loop without restarting the process or re-running earlier agents.
+
+## Fixture Capture
+
+Pressing `f` calls `capture_fixture()`, which saves the full `AgentResult` (messages, raw response, parsed data, tokens) as YAML in `tests/fixtures/`.
+
+These fixtures feed into `test_prompt_regression.py` — debug a problem, capture the failing case, fix the prompt, and the captured fixture becomes a regression test.
 
 ## Replay Mode
 
-Walk through historical turns from an existing save:
+Walk through historical turns from a save that was run with `debug=True` (uses the [diagnostics filesystem](../reference/observability.md#diagnostics-filesystem)):
 
 ```bash
 uv run python scripts/debug_turn.py --save my-save --replay
@@ -47,24 +68,36 @@ uv run python scripts/debug_turn.py --save my-save --replay
 
 | Key | Action |
 |-----|--------|
-| Enter | Next turn |
+| `Enter` | Next turn |
 | `p` | Previous turn |
-| *N* | Jump to turn N |
-| `d` | Diff current turn's agent outputs against the previous turn |
+| `N` | Jump to turn N |
+| `d` | Diff against previous turn |
 | `q` | Quit |
 
-Replay mode reads from the diagnostics filesystem (requires the save to have been run with `debug=True`). It does not make LLM calls.
+## Design
+
+The debugger wraps agents, not the engine. It requires a real game save — loading game state, characters, and conversation history from a save directory. There is no mock mode. This means the debugger exercises the exact same code paths as production, so any fix validated here works in the real game loop.
+
+## Troubleshooting
+
+| Symptom | What to Check | Tool |
+|---------|---------------|------|
+| Empty narrator response | System prompt too long | Context profiler |
+| Narrator outputs prose instead of YAML | YAML hint missing or weak | Inspect prompt (`i` then `p`) |
+| Character breaks voice | Personality too vague | Check character YAML file |
+| Memory agent hallucinates facts | Turn events include wrong characters | Inspect memory prompt |
+| Game state never completes chapter | Completion condition too strict | Check chapter YAML file |
+| Model echoes prompt back | Context overflow | Context profiler |
 
 ## Key Files
 
 | File | Contents |
 |------|----------|
-| `src/theact/debugger/debugger.py` | `TurnDebugger` class — core stepping and replay logic |
-| `src/theact/debugger/types.py` | `AgentResult`, `DebugStep`, `DebugSession` data types |
+| `src/theact/debugger/debugger.py` | `TurnDebugger` class |
+| `src/theact/debugger/types.py` | `AgentResult`, `DebugStep`, `DebugSession` |
 | `scripts/debug_turn.py` | CLI entry point |
 
-## Further Reading
+## See Also
 
-- [Observability & Diagnostics](diagnostics.md) — the logging and filesystem the debugger builds on
-- [Prompt Iteration](prompt-iteration.md) — the broader prompt-fixing workflow
-- [Agents](../design/agents.md) — what each agent does and its expected output
+- [Observability](../reference/observability.md) — the logging infrastructure the debugger builds on
+- [Prompt Engineering](prompt-engineering.md) — the broader iteration workflow

@@ -38,19 +38,20 @@ Code layout:
 ## Documentation
 
 - `docs/README.md` — **Start here.** Navigation hub for all documentation.
-- `docs/design/` — Architecture, agents, data model, memory, observability, debugger
-- `docs/guides/` — How-to guides for gameplay, development, testing, and debugging
-- `docs/requirements.md` — Design rationale — the "why" behind decisions
-- `docs/model-quirks.yaml` — Observed 7B model behaviors and workarounds
+- `docs/concepts.md` — Core concepts, glossary, design principles
+- `docs/getting-started.md` — Install, configure, play your first game
+- `docs/architecture/` — Turn pipeline, data model, agents, memory, save versioning
+- `docs/guides/` — Creating games, playtesting, debugging, prompt engineering
+- `docs/reference/` — Observability, game creation pipeline, design rationale, model quirks
 
 ## Observability & Debugging Tools
 
-These tools exist for diagnosing and improving model behavior. See `docs/guides/` for details.
+These tools exist for diagnosing and improving model behavior. See `docs/reference/observability.md` and `docs/guides/debugging.md` for details.
 
 - **Call logging** — Every LLM call records tokens, latency, parse result. See `src/theact/llm/call_log.py`.
 - **Diagnostics writer** — `run_turn(..., debug=True)` writes per-agent artifacts (prompts, responses, parsed output) to `diagnostics/turn-NNN/`.
 - **Context profiler** — `src/theact/llm/profiler.py` — analyze token budget allocation per agent.
-- **Turn debugger** — `scripts/debug_turn.py` — step through agents interactively, replay with edited prompts, capture fixtures. See `docs/guides/debugging.md`.
+- **Turn debugger** — `scripts/debug_turn.py` — step through agents interactively, replay with edited prompts, capture fixtures. See `docs/guides/debugging.md` for usage.
 - **Error taxonomy** — 7-category `ParseFailureType` in `src/theact/llm/errors.py` classifies why YAML parsing failed.
 - **Prompt linting** — `tests/test_prompt_lint.py` enforces ≤300 token budgets and no orphan placeholders.
 
@@ -98,31 +99,15 @@ uv run python scripts/run_golden.py                              # Golden scenar
 uv run python scripts/ab_test.py --variant-b prompts_v2.py --runs 3  # A/B test
 ```
 
-## Playwright MCP (Browser Testing)
-
-Web UI tests use Playwright. If you're using Claude Code, add the Playwright MCP server to your `~/.claude.json` under this project's `mcpServers`:
-
-```json
-{
-  "command": "npx",
-  "args": ["-y", "@playwright/mcp@latest", "--headless", "--browser", "chromium"]
-}
-```
-
-To install the browser binary:
-```bash
-npx -y @playwright/test@latest install chromium
-```
-
 ## Environment
 
-Requires a `.env` file — copy from `.env.example`:
+Requires a `.env` file (see `docs/getting-started.md` for full setup):
 ```bash
 cp .env.example .env
 # Edit .env with your Venice AI API key
 ```
 
-See `.env.example` for all available configuration variables.
+Web UI browser tests require Chromium: `npx -y @playwright/test@latest install chromium`
 
 ## Key Technical Decisions
 

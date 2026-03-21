@@ -1,44 +1,39 @@
-# TheAct Documentation
+# Documentation
 
-TheAct is a programmatically-driven text RPG engine designed for small language models (7B-class). Code orchestrates every turn — narrator, characters, memory, game state — with each LLM call doing exactly one focused task.
-
-**New here?** Start with the [Getting Started guide](guides/getting-started.md).
+New here? Start with [Core Concepts](concepts.md), then [Getting Started](getting-started.md).
 
 ## Using TheAct
 
-| Guide | Description |
-|-------|-------------|
-| [Getting Started](guides/getting-started.md) | Install, configure, play your first game |
+| Document | Description |
+|----------|-------------|
+| [Getting Started](getting-started.md) | Install, configure, play your first game |
 | [Creating a Game](guides/creating-a-game.md) | Write game YAML files or use the creator agent |
-| [Playtesting](guides/playtesting.md) | Run and interpret autonomous playtests |
-| [Prompt Iteration](guides/prompt-iteration.md) | Tune prompts when the model misbehaves |
 
-## Debugging & Testing
-
-| Guide | Description |
-|-------|-------------|
-| [Debugging](guides/debugging.md) | Step through agents with the turn debugger |
-| [Diagnostics](guides/diagnostics.md) | Call logging, error taxonomy, context profiling |
-| [Golden Scenarios](guides/golden-scenarios.md) | Behavioral test scenarios with structural assertions |
-| [A/B Testing](guides/ab-testing.md) | Compare prompt variants with statistical metrics |
-
-## Understanding the Architecture
+## Understanding the System
 
 | Document | Description |
 |----------|-------------|
-| [Architecture](design/architecture.md) | Turn pipeline, module map, concurrency, streaming |
-| [Agents](design/agents.md) | Agent roles, prompt design, structured output |
-| [Data Model](design/data-model.md) | Game files, save files, Pydantic models |
-| [Memory & Summarization](design/memory-and-summarization.md) | Character memory, rolling summary, context budgeting |
-| [Observability](design/observability.md) | Call logging, diagnostics, error taxonomy design |
-| [Creator Agent](design/creator.md) | Game creation pipeline, proposal/generation phases, validation |
-| [Turn Debugger](design/debugger.md) | Debugger architecture and design decisions |
+| [Core Concepts](concepts.md) | Key terms and how the system works at a high level |
+| [Architecture](architecture/overview.md) | Turn pipeline, module map, concurrency, streaming |
+| [Data Model](architecture/data-model.md) | Game files, save files, Pydantic models |
+| [Agents](architecture/agents.md) | Agent roles, prompt design, structured output |
+| [Memory & Summarization](architecture/memory.md) | Character memory, rolling summary, context budgeting |
+
+## Development & Debugging
+
+| Document | Description |
+|----------|-------------|
+| [Observability](reference/observability.md) | Call logging, diagnostics, error taxonomy, profiler |
+| [Debugging](guides/debugging.md) | Turn debugger and troubleshooting |
+| [Playtesting](guides/playtesting.md) | Autonomous playtest framework, golden scenarios |
+| [Prompt Engineering](guides/prompt-engineering.md) | Prompt iteration, A/B testing, model quirks |
 
 ## Reference
 
 | Document | Description |
 |----------|-------------|
-| [Requirements & Rationale](requirements.md) | Why decisions were made |
-| [Model Quirks](model-quirks.yaml) | Observed 7B model behaviors and workarounds |
-| [Phase Plans](plans/) | Step-by-step implementation plans (Phases 01-11) |
-| [CLAUDE.md](../CLAUDE.md) | Context for AI-assisted development |
+| [Save Versioning](architecture/save-versioning.md) | Git-based saves, forking, undo |
+| [Game Creation Pipeline](reference/game-creation-pipeline.md) | Creator agent internals |
+| [Requirements & Rationale](reference/requirements.md) | Why design decisions were made |
+| [Model Quirks](reference/model-quirks.yaml) | Observed 7B model behaviors and workarounds |
+| [Phase Plans](plans/) | Step-by-step implementation plans (01-11) |

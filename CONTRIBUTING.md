@@ -1,61 +1,60 @@
 # Contributing to TheAct
 
-## Working with Claude Code
+## Development Setup
 
-### Prerequisites
+**Prerequisites:** Python 3.11+, [uv](https://docs.astral.sh/uv/), Node.js 18+ (browser tests only)
 
-- Python 3.11+ managed with [uv](https://docs.astral.sh/uv/)
-- Node.js 18+ (for Playwright MCP and browser tests)
-- Pre-commit formatting via `prek` (`uv tool install prek && prek install`)
+```bash
+git clone https://github.com/your-org/theact.git
+cd theact
+uv sync
+cp .env.example .env    # Add your VENICE_API_KEY
+```
 
-### Playwright MCP Setup
+Install the pre-commit formatter:
 
-Claude Code uses a [Playwright MCP server](https://github.com/anthropics/model-context-protocol) to interact with the web UI in a real browser. This enables Claude to navigate pages, inspect the DOM, and verify UI behavior directly.
+```bash
+uv tool install prek && prek install
+```
 
-**1. Install Chromium for Playwright:**
+## Running Tests
+
+```bash
+uv run pytest tests/ -x            # Unit tests
+uv run pytest tests/web/ -x        # Browser tests (requires Chromium)
+uv run pytest -x                   # All tests
+```
+
+Browser tests require Chromium. Install it with:
+
 ```bash
 npx -y @playwright/test@latest install chromium
 ```
 
-**2. Register the MCP server with Claude Code:**
-```bash
-claude mcp add playwright -- npx -y @playwright/mcp@latest --headless
-```
+## Development Tools
 
-This adds the server to your local Claude config (`~/.claude.json`). The `--headless` flag runs Chromium without a GUI window, which is required in WSL and headless environments.
+| Tool | Command | Docs |
+|------|---------|------|
+| Playtest | `scripts/playtest.py` | [Playtesting](docs/guides/playtesting.md) |
+| Turn Debugger | `scripts/debug_turn.py` | [Debugging](docs/guides/debugging.md) |
+| Golden Scenarios | `scripts/run_golden.py` | [Playtesting](docs/guides/playtesting.md) |
+| A/B Testing | `scripts/ab_test.py` | [Prompt Engineering](docs/guides/prompt-engineering.md) |
+| Dev Server | `scripts/dev_server.py` | -- |
 
-**3. Verify it works:**
+All scripts are run via `uv run python <script>`. See linked docs for usage details.
 
-Launch `claude` in the project directory and ask it to open a URL with Playwright. The MCP tools (`browser_navigate`, `browser_snapshot`, `browser_click`, etc.) should be available.
-
-### Running Tests
-
-```bash
-# Unit tests (fast, no browser needed)
-uv run pytest tests/ -x
-
-# Web UI browser tests (requires Chromium installed)
-uv run pytest tests/web/ -x
-
-# All tests
-uv run pytest -x
-```
-
-### Web UI Development
+## Web UI Development
 
 ```bash
-# Start the web UI server
-uv run python -m theact.web
-
-# Start with auto-reload for development
 uv run python -m theact.web --reload
 ```
 
-The web UI runs at `http://localhost:8080` by default.
+Runs at `localhost:8080` with hot reload.
 
-### Test Structure
+## Code Style
 
-- `tests/` — Unit tests (models, IO, LLM client, engine, CLI, agents)
-- `tests/web/` — Web UI tests split into:
-  - Unit tests for pure logic (slugify, commands, styles)
-  - Browser integration tests using `pytest-playwright` (run against a live NiceGUI server)
+- **Formatting:** ruff, enforced via `prek` pre-commit hook
+- **Type hints** throughout -- no untyped public functions
+- **Pydantic v2** with `extra="forbid"` to catch typos in data files
+- **All LLM calls are async** -- use `AsyncOpenAI` and `await`
+- **YAML for everything** -- data files, structured LLM output, game content
