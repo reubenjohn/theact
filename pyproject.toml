@@ -1,9 +1,16 @@
 [project]
 name = "theact"
 version = "0.1.0"
-description = "Add your description here"
+description = "AI text-based RPG engine designed for small language models"
 readme = "README.md"
+license = "MIT"
+authors = [{ name = "Reuben John", email = "reubenvjohn@gmail.com" }]
 requires-python = ">=3.11"
+
+[project.urls]
+Homepage = "https://github.com/reubenvjohn/theact"
+Repository = "https://github.com/reubenvjohn/theact"
+Issues = "https://github.com/reubenvjohn/theact/issues"
 dependencies = [
     "gitpython>=3.1.46",
     "openai>=2.29.0",

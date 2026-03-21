@@ -100,29 +100,29 @@ uv run python scripts/ab_test.py --variant-b prompts_v2.py --runs 3  # A/B test
 
 ## Playwright MCP (Browser Testing)
 
-A Playwright MCP server is configured for this project, giving Claude Code direct browser interaction capabilities (navigate, click, inspect DOM via accessibility snapshots).
+Web UI tests use Playwright. If you're using Claude Code, add the Playwright MCP server to your `~/.claude.json` under this project's `mcpServers`:
 
-- **Config location:** `~/.claude.json` → `projects["/home/reuben/workspace/theact"].mcpServers.playwright`
-- **Mode:** headless Chromium (no GUI needed in WSL)
-- **Command:** `npx -y @playwright/mcp@latest --headless --browser chromium`
-- **Browser cache:** `~/.cache/ms-playwright/`
+```json
+{
+  "command": "npx",
+  "args": ["-y", "@playwright/mcp@latest", "--headless", "--browser", "chromium"]
+}
+```
 
-To reinstall the browser binary if needed:
+To install the browser binary:
 ```bash
 npx -y @playwright/test@latest install chromium
 ```
 
 ## Environment
 
-Requires a `.env` file (already configured in the project root):
-```
-VENICE_API_KEY=<set>
-VENICE_BASE_URL=https://api.venice.ai/api/v1     # optional
-VENICE_MODEL=olafangensan-glm-4.7-flash-heretic   # optional
-THEACT_DATA_DIR=/path/to/data                     # optional — contains games/ and saves/
+Requires a `.env` file — copy from `.env.example`:
+```bash
+cp .env.example .env
+# Edit .env with your Venice AI API key
 ```
 
-The API key is available for live model testing, diagnostics, and playtest runs.
+See `.env.example` for all available configuration variables.
 
 ## Key Technical Decisions
 
@@ -141,3 +141,10 @@ The API key is available for live model testing, diagnostics, and playtest runs.
 - Type hints throughout
 - Pre-commit: ruff lint + format via `prek`
 - Tests: pytest with `tmp_path` fixtures for file operations
+
+## Contributing to CLAUDE.md
+
+This file is checked into the repo and read by all contributors' AI tools. Keep it generic:
+- **No absolute paths** — use relative paths or `~` notation
+- **No machine-specific config** — put personal setup in Claude Code memory or local dotfiles
+- **No API keys or secrets** — reference `.env.example` instead

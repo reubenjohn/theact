@@ -1,21 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(uv tool install prek)",
-      "Bash(prek install)",
-      "Bash(prek run --all-files)",
-      "Bash(uv add:*)",
-      "Bash(set -a)",
-      "Bash(source .env)",
-      "Bash(set +a)",
-      "Bash(uv run src/getting_started.py)",
-      "Bash(uv run python src/getting_started.py)",
-      "Bash(uv run python -m theact.web)",
-      "Bash(source .env)",
       "Bash(uv run:*)",
+      "Bash(uv add:*)",
+      "Bash(prek run --all-files)",
       "Bash(npx playwright:*)",
-      "Read(//home/reuben/.cache/ms-playwright/**)",
-      "Bash(npx -y @playwright/mcp@latest --headless)",
       "mcp__playwright__browser_navigate",
       "mcp__playwright__browser_click",
       "mcp__playwright__browser_type",
