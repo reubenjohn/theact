@@ -50,9 +50,10 @@ class TestGameplayView:
 
     def test_header_shows_game_info(self, gameplay_page):
         # Header shows "The Lost Island -- Turn N -- ChapterTitle"
-        # Use .first to avoid strict mode with multiple matches from save cards
-        header = gameplay_page.get_by_text("The Lost Island -- Turn", exact=False)
-        expect(header.first).to_be_visible()
+        # Scope to the visible chat column to avoid matching hidden save cards
+        chat_col = gameplay_page.locator(".chat-column")
+        header = chat_col.get_by_text("The Lost Island -- Turn", exact=False)
+        expect(header).to_be_visible()
 
     def test_input_field_present(self, gameplay_page):
         input_field = gameplay_page.locator('input[placeholder="What do you do?"]')
