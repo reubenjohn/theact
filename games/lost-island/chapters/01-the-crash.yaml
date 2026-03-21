@@ -1,0 +1,16 @@
+id: 01-the-crash
+title: The Crash
+summary: >
+  Player wakes alone on the beach amid wreckage. They explore, find evidence
+  of death, and discover Maya — the first sign they are not alone.
+beats:
+  - Player wakes on the beach, disoriented and injured
+  - Explores crash debris and finds supplies
+  - Discovers a body — death is real here
+  - Finds Maya working alone beyond the headland
+  - Together they establish a basic camp
+  - First night — strange sounds from the jungle
+completion: Player and Maya have established camp and survived the first night.
+characters:
+  - maya
+next: 02-survival

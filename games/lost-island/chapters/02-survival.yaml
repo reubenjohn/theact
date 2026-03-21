@@ -1,0 +1,17 @@
+id: 02-survival
+title: Survival
+summary: >
+  Player and Maya struggle to survive. They find fresh water, forage for food,
+  and encounter Father Joaquin emerging from the jungle.
+beats:
+  - Search for fresh water inland
+  - Discover fruit trees with strange markings on the bark
+  - Find Joaquin praying at a stone altar
+  - Joaquin reveals he has been here before but is vague about when
+  - Tensions rise as supplies dwindle
+  - A structure is glimpsed through the canopy at dusk
+completion: All three survivors are together and have seen the structure in the jungle.
+characters:
+  - maya
+  - joaquin
+next: 03-the-discovery
