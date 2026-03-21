@@ -123,7 +123,7 @@ async def create_game(concept: str | None = None) -> Path | None:
         if feedback.strip().lower() in ("ok", "looks good", "good", "yes", "y"):
             break
         console.print("\n[dim]Revising...[/dim]\n")
-        data = await _revise_targeted(data, feedback, client, config)
+        data = await revise_targeted(data, feedback, client, config)
         result = validate_game_data(data)
         if not result.valid:
             data, result = await fix_validation_errors(data, result, client, config)
@@ -285,7 +285,7 @@ async def classify_revision_targets(
         return []  # Fall back to full pipeline on classifier failure
 
 
-async def _revise_targeted(
+async def revise_targeted(
     data: dict,
     feedback: str,
     client: AsyncOpenAI,

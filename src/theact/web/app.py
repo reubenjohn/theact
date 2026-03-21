@@ -82,3 +82,18 @@ def setup_app() -> None:
             on_load_game=lambda game: enter_gameplay(game, auto_start=False),
         )
         menu.build(page_state["menu_container"])
+
+    @ui.page("/create")
+    async def create_page():
+        """Game creation wizard page."""
+        from theact.web.creator_wizard import CreatorWizard
+
+        wizard = CreatorWizard(on_complete=lambda: ui.navigate.to("/"))
+        wizard.build()
+
+    @ui.page("/settings")
+    async def settings_page():
+        """Settings page for LLM and display configuration."""
+        from theact.web.settings import build_settings_page
+
+        build_settings_page(on_back=lambda: ui.navigate.to("/"))
