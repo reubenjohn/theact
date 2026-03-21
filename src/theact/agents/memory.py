@@ -6,6 +6,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
+from theact.agents.prompts import MAX_KEY_FACTS
 from theact.engine.context import build_memory_messages
 from theact.engine.types import MemoryDiff
 from theact.llm.call_log import LLMCallLog, LLMCallRecord
@@ -136,8 +137,8 @@ async def run_memory_update(
     for fact in data.get("add", []) or []:
         new_facts.append(fact)
 
-    # Enforce max 10 key facts
-    new_facts = new_facts[:10]
+    # Enforce max key facts limit
+    new_facts = new_facts[:MAX_KEY_FACTS]
 
     return MemoryDiff(
         character=character.name,

@@ -129,11 +129,6 @@ Keep it under 5 sentences. Drop minor details. Keep key plot points,
 character relationships, and discoveries.
 Write in past tense. Be specific."""
 
-# ─── YAML HINTS ──────────────────────────────────────────────────────────
-# Short reminders appended to user messages for structured output agents.
 
-YAML_HINT_NARRATOR = "Respond with a single ```yaml``` block containing narration, responding_characters, and mood."
-
-YAML_HINT_MEMORY = "Respond with a single ```yaml``` block containing add, remove, update, and summary."
-
-YAML_HINT_GAME_STATE = "Respond with a single ```yaml``` block containing chapter_complete, reason, and new_beats."
+# Maximum number of key facts per character memory.
+MAX_KEY_FACTS = 10

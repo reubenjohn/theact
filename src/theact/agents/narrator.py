@@ -109,7 +109,7 @@ async def run_narrator(
             return NarratorOutput(
                 narration=raw_content.strip() or "(The narrator is silent.)",
                 responding_characters=[],
-                mood="neutral",
+                mood="calm",
             )
 
     if call_log:
