@@ -53,6 +53,10 @@ def _load_save_into_gameplay(page, web_server, save_id, save_path=None) -> None:
     page.goto(web_server)
     page.wait_for_load_state("networkidle")
 
+    # Close any stale dialogs from previous tests
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(200)
+
     # Click the Load button on the save card
     save_card = page.locator(f'[data-testid="save-card-{save_id}"]')
     save_card.locator("button").first.click()
