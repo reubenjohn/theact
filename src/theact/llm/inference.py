@@ -234,7 +234,7 @@ async def stream_structured(
     awaiting the future. If the stream is not fully consumed, the future
     will never resolve.
     """
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     result_future: asyncio.Future[StructuredResult] = loop.create_future()
     content_parts: list[str] = []
     thinking_parts: list[str] = []
