@@ -1,19 +1,17 @@
 id: 01-the-crash
 title: The Crash
 summary: >
-  The player wakes alone on a beach amid plane wreckage. They explore the
-  debris, find evidence of death, and discover Maya. Together they
-  establish camp. Father Joaquin appears from the jungle with unsettling
-  calm and knowledge of which plants are safe to eat.
+  Player wakes on a beach amid wreckage. Finds evidence of death,
+  discovers Maya, and establishes camp. Joaquin appears from the
+  jungle with unsettling calm.
 beats:
-  - Player wakes on the beach, disoriented and injured
-  - Explores wreckage and finds basic supplies
-  - Discovers a body -- death is real here
-  - Finds Maya working alone beyond the headland
-  - Father Joaquin emerges from the jungle, strangely calm
-  - Group establishes camp and survives the first night
-completion: >
-  Player, Maya, and Joaquin have formed a group and established a camp.
+  - Player wakes on the beach, disoriented
+  - Explores wreckage, finds supplies
+  - Discovers a body -- death is real
+  - Finds Maya beyond the headland
+  - Joaquin emerges from the jungle
+  - Group establishes camp, survives first night
+completion: The group has formed and established camp.
 characters:
   - maya
   - joaquin

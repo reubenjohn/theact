@@ -1,21 +1,17 @@
 id: 02-the-discovery
 title: The Discovery
 summary: >
-  Exploring inland for fresh water, the group finds ancient stone ruins
-  covered in strange carvings. A corridor leads deeper than it should
-  into a chamber with an artifact on a stone plinth. Maya wants to study
-  it. Joaquin begs them to leave it alone. The island's anomalies grow
-  stronger -- compasses spin, drumming echoes at night.
+  Exploring inland, the group finds ancient ruins with strange
+  carvings and a chamber with an artifact. Maya and Joaquin
+  disagree about what to do.
 beats:
-  - Group treks inland and finds a freshwater spring
-  - Strange anomalies appear -- compass spinning, eerie silence
-  - Stone ruins discovered half-buried in the jungle
-  - A corridor that is longer on the inside than the outside
-  - A chamber with an artifact on a plinth
-  - Maya and Joaquin clash over what to do with the artifact
-completion: >
-  The artifact has been found and the player has taken a side in the
-  Maya-Joaquin disagreement about the ruins.
+  - Group treks inland, finds fresh water
+  - Strange anomalies -- compass spinning, silence
+  - Stone ruins discovered in the jungle
+  - A corridor longer inside than outside
+  - Chamber with an artifact on a plinth
+  - Maya and Joaquin clash over the artifact
+completion: Artifact found and the player has taken a side.
 characters:
   - maya
   - joaquin

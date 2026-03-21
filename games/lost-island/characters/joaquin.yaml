@@ -1,10 +1,8 @@
 name: Father Joaquin Reyes
-role: Mysterious priest who has been to this island before.
+role: Mysterious priest who has visited this island before.
 personality: >
-  Calm, cryptic, speaks in parables and questions. Genuinely kind but
-  evasive about specifics. Gets quieter when most serious.
-  Never raises his voice.
-secret: >
-  Visited this island 40 years ago. His companions entered the caves and never returned.
+  Calm, cryptic, speaks in parables. Kind but evasive.
+  Gets quieter when serious. Never raises his voice.
+secret: Came here 40 years ago. His companions entered the caves and never returned.
 relationships:
-  maya: "Admires her strength but worries about her refusal to accept mystery."
+  maya: "Admires her strength but fears her refusal to accept mystery."

@@ -132,15 +132,15 @@ Output ALL files in a single YAML block with this exact structure:
 
 ```yaml
 game:
-  id: "{game_id}"
-  title: "{title}"
+  id: "url-safe-slug"
+  title: "Display Title"
   description: "One-sentence pitch"
   characters:
-    - "{char_stem_1}"
-    - "{char_stem_2}"
+    - "char_stem_1"
+    - "char_stem_2"
   chapters:
-    - "{chapter_id_1}"
-    - "{chapter_id_2}"
+    - "01-chapter-slug"
+    - "02-chapter-slug"
 
 world:
   setting: |
@@ -151,27 +151,27 @@ world:
     2 sentences.
 
 characters:
-  {char_stem_1}:
+  char_stem_1:
     name: "Display Name"
     role: "One-line role"
     personality: |
       2-3 short sentences.
     secret: "One sentence."
     relationships:
-      {other_char_stem}: "One-line stance"
+      other_char_stem: "One-line stance"
 
-  {char_stem_2}:
+  char_stem_2:
     name: "Display Name"
     role: "One-line role"
     personality: |
       2-3 short sentences.
     secret: "One sentence."
     relationships:
-      {other_char_stem}: "One-line stance"
+      other_char_stem: "One-line stance"
 
 chapters:
-  {chapter_id_1}:
-    id: "{chapter_id_1}"
+  01-chapter-slug:
+    id: "01-chapter-slug"
     title: "Chapter Title"
     summary: |
       2-3 sentences.
@@ -182,11 +182,11 @@ chapters:
       - "Short phrase"
     completion: "One sentence condition"
     characters:
-      - "{char_stem}"
-    next: "{chapter_id_2}"
+      - "char_stem"
+    next: "02-chapter-slug"
 
-  {chapter_id_2}:
-    id: "{chapter_id_2}"
+  02-chapter-slug:
+    id: "02-chapter-slug"
     title: "Chapter Title"
     summary: |
       2-3 sentences.
@@ -197,7 +197,7 @@ chapters:
       - "Short phrase"
     completion: "One sentence condition"
     characters:
-      - "{char_stem}"
+      - "char_stem"
     next: null
 ```
 

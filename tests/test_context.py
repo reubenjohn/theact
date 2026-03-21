@@ -164,13 +164,11 @@ class TestFormatChapterContext:
 
     def test_shows_beat_status(self, lost_island_game: LoadedGame):
         # Mark one beat as hit
-        lost_island_game.state.beats_hit = [
-            "Player wakes on the beach, disoriented and injured"
-        ]
+        lost_island_game.state.beats_hit = ["Player wakes on the beach, disoriented"]
         result = format_chapter_context(lost_island_game)
         assert "[x] Player wakes on the beach" in result
         # Other beats should be unchecked
-        assert "[ ] Explores wreckage and finds basic supplies" in result
+        assert "[ ] Explores wreckage, finds supplies" in result
 
     def test_includes_upcoming(self, lost_island_game: LoadedGame):
         result = format_chapter_context(lost_island_game)
@@ -422,9 +420,7 @@ class TestBuildGameStateMessages:
         assert messages[1]["role"] == "user"
 
     def test_includes_beats_with_status(self, lost_island_game: LoadedGame):
-        lost_island_game.state.beats_hit = [
-            "Player wakes on the beach, disoriented and injured"
-        ]
+        lost_island_game.state.beats_hit = ["Player wakes on the beach, disoriented"]
         entries = [
             ConversationEntry(turn=2, role="narrator", content="You explore."),
         ]
