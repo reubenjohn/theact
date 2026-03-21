@@ -9,7 +9,9 @@
       "Bash(source .env)",
       "Bash(set +a)",
       "Bash(uv run src/getting_started.py)",
-      "Bash(source .env)"
+      "Bash(uv run python src/getting_started.py)",
+      "Bash(source .env)",
+      "Read(//home/reuben/workspace/theact/**)"
     ]
   }
 }
