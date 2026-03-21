@@ -17,8 +17,8 @@ When a player starts a new game, the save directory is initialized as a git repo
 
 - `state.yaml` — current chapter, turn number, game flags
 - `conversation.yaml` — full conversation log (appended each turn)
-- `memories/` — per-character memory files
-- `summaries.yaml` — rolling narrative summary
+- `memory/` — per-character memory files
+- `summaries.yaml` — chapter summaries (completed chapter recaps)
 
 Every turn is one atomic commit. No partial state.
 
@@ -43,8 +43,8 @@ Read any file at a historical turn:
 ```python
 from theact.versioning import peek_at_turn
 
-# Read state.yaml as it was at turn 5
-content = peek_at_turn(save_path, turn_number=5, file_path="state.yaml")
+# Read all state files as they were at turn 5
+files = peek_at_turn(save_path, turn_number=5)
 ```
 
 Diff files between two turns:
@@ -68,7 +68,7 @@ from theact.versioning import save_as
 save_as(save_path, "alternate-timeline")
 ```
 
-The new save is a full git clone — it retains all history from the original. Use this to branch a story at a decision point and explore different paths.
+The new save is a filesystem copy (`shutil.copytree`) that includes the `.git` directory — it retains all history from the original. Use this to branch a story at a decision point and explore different paths.
 
 ## Why Git
 
@@ -83,14 +83,14 @@ The new save is a full git clone — it retains all history from the original. U
 
 ## Implementation
 
-`src/theact/versioning/git_save.py` — uses GitPython (`gitdb`).
+`src/theact/versioning/git_save.py` — uses GitPython.
 
 Key functions:
 
-- `init_save(path)` — initialize a new save as a git repo
+- `init_repo(save_path, game_title)` — initialize a new save as a git repo
 - `commit_turn(path, turn)` — stage all changes and commit
 - `undo(path, n=1)` — reset to N turns ago
-- `peek_at_turn(path, turn, file)` — read a file at a specific turn
+- `peek_at_turn(path, turn)` — read all state files at a specific turn (returns `dict[str, str]`)
 - `diff_turns(path, a, b)` — diff between two turns
 - `save_as(path, name)` — clone save to a new directory
 

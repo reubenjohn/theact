@@ -47,11 +47,10 @@ All prompts live in `src/theact/agents/prompts.py` — a single file, by design,
 
 Agents that produce structured data (narrator, memory, game state) follow this parsing flow:
 
-1. The prompt includes a concrete YAML example showing the exact expected format.
-2. A YAML hint is appended to the user message (`YAML_HINT_*` constants in `prompts.py`).
-3. The model response passes through `extract_yaml_block()`, which finds the last fenced YAML block via regex.
-4. The extracted text is parsed with `yaml.safe_load()`.
-5. On parse failure, the model is retried with the error message fed back for self-correction.
+1. The prompt includes a concrete YAML example showing the exact format expected (the example is inline in the prompt template).
+2. The model response passes through `extract_yaml_block()`, which finds the last fenced YAML block via regex.
+3. The extracted text is parsed with `yaml.safe_load()`.
+4. On parse failure, the model is retried with the error message fed back for self-correction.
 
 Why YAML and not JSON? Small models produce more reliable YAML — multiline strings need no escaping, quotes are optional, and whitespace is forgiving. See [Concepts](../concepts.md) for the full rationale.
 

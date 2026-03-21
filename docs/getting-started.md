@@ -11,7 +11,7 @@ Go from zero to playing a game in under 5 minutes.
 ## Install
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/reubenjohn/theact.git
 cd theact
 uv sync
 ```

@@ -5,7 +5,7 @@
 **Prerequisites:** Python 3.11+, [uv](https://docs.astral.sh/uv/), Node.js 18+ (browser tests only)
 
 ```bash
-git clone https://github.com/your-org/theact.git
+git clone https://github.com/reubenjohn/theact.git
 cd theact
 uv sync
 cp .env.example .env    # Add your VENICE_API_KEY
@@ -46,6 +46,7 @@ All scripts are run via `uv run python <script>`. See linked docs for usage deta
 ## Web UI Development
 
 ```bash
+uv sync --extra web
 uv run python -m theact.web --reload
 ```
 

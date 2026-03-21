@@ -28,7 +28,7 @@ Every LLM call produces an `LLMCallRecord` with the following fields:
 | Field | Description |
 |-------|-------------|
 | `timestamp` | When the call started |
-| `agent` | Which agent (`narrator`, `character-maya`, `memory-maya`, etc.) |
+| `agent` | Which agent (`narrator`, `character:maya`, `memory:maya`, `game_state`, etc.) |
 | `turn` | Turn number |
 | `prompt_tokens` | Tokens in the prompt |
 | `thinking_tokens` | Tokens used for model reasoning |
@@ -67,9 +67,9 @@ diagnostics/turn-001/
     user_message.txt      # User message
     raw_response.txt      # Full model output
     call_record.yaml      # Tokens, latency, parse result
-  character-maya/
+  character:maya/
     ...
-  memory-maya/
+  memory:maya/
     ...
   game_state/
     ...
@@ -80,7 +80,7 @@ Plain text for prompts and responses (readable with `cat`/`less`), YAML for meta
 
 ## Error Taxonomy
 
-Every `YAMLParseError` carries a `failure_type` field from this canonical set of seven types. Each maps to a different fix strategy — lumping types would hide whether the model is ignoring instructions or trying and failing.
+Every `YAMLParseError` carries a `failure_type` field from this canonical set of six types. Each maps to a different fix strategy — lumping types would hide whether the model is ignoring instructions or trying and failing.
 
 | Type | What Happened | Fix Direction |
 |------|---------------|---------------|
@@ -90,7 +90,6 @@ Every `YAMLParseError` carries a `failure_type` field from this canonical set of
 | `wrong_schema` | Valid YAML, wrong fields | Update example in prompt to match expected schema |
 | `json_instead` | Model output JSON not YAML | Add "Output YAML, not JSON" rule to prompt |
 | `echo_prompt` | Model echoed the prompt | Reduce prompt size, check for context overflow |
-| `truncated` | Response cut off mid-YAML | Increase `max_tokens` or reduce prompt size |
 
 These types appear in call logs, diagnostics files, and playtest reports.
 
@@ -105,7 +104,7 @@ profile = profile_messages("narrator", messages, max_tokens_budget=2000)
 print(format_profile(profile))
 ```
 
-Prints token allocation per message component, a visual bar showing usage, and remaining headroom. Use this to find which part of a prompt is consuming the budget.
+Prints token allocation per message component with numeric token counts and remaining headroom. Use this to find which part of a prompt is consuming the budget.
 
 ## Prompt Linting
 
@@ -125,7 +124,7 @@ These run as part of the standard test suite and catch budget regressions before
 | `src/theact/llm/call_log.py` | `LLMCallRecord`, `LLMCallLog` |
 | `src/theact/engine/diagnostics.py` | Diagnostics filesystem writer |
 | `src/theact/llm/profiler.py` | `profile_messages()`, `format_profile()` |
-| `src/theact/llm/errors.py` | `YAMLParseError`, `ParseFailureType` |
+| `src/theact/llm/parsing.py` | `YAMLParseError`, `ParseFailureType` |
 | `tests/test_prompt_lint.py` | Prompt budget enforcement |
 
 ## See Also

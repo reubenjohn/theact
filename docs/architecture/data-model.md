@@ -51,7 +51,7 @@ flowchart LR
     GD["Game Definition\n(template)"] -->|"copy on\nnew game"| Save["Save Directory"]
     Save --> State["state.yaml\nturn, chapter, beats"]
     Save --> Conv["conversation.yaml\ndialogue log"]
-    Save --> Mem["memories/*.yaml\nper-character"]
+    Save --> Mem["memory/*.yaml\nper-character"]
     Save --> Sum["summaries.yaml\nchapter recaps"]
     Save --> Git[".git/\none commit per turn"]
 ```
@@ -63,7 +63,7 @@ saves/lost-island-001/
   game.yaml, world.yaml, characters/, chapters/   (copied from template)
   state.yaml              # GameState: turn counter, current chapter, beats hit
   conversation.yaml       # List of ConversationEntry
-  memories/
+  memory/
     maya.yaml             # CharacterMemory: summary + key facts
     joaquin.yaml
   summaries.yaml          # ChapterSummary list
@@ -74,10 +74,10 @@ saves/lost-island-001/
 
 | File | Model | Key Fields |
 |---|---|---|
-| `state.yaml` | `GameState` | turn, current_chapter, beats_hit, last_summarized_turn, rolling_summary, flags |
-| `conversation.yaml` | `ConversationEntry` (list) | turn, role (narrator/character/player), character_name, content |
-| `memories/*.yaml` | `CharacterMemory` | summary (3-5 sentences), facts (max 10) |
-| `summaries.yaml` | `ChapterSummary` (list) | chapter_id, summary |
+| `state.yaml` | `GameState` | player_name, current_chapter, turn, beats_hit, chapter_history, rolling_summary, last_summarized_turn, game_complete, flags |
+| `conversation.yaml` | `ConversationEntry` (list) | turn, role (narrator/character/player), character, content |
+| `memory/*.yaml` | `CharacterMemory` | summary (3-5 sentences), key_facts (max 10) |
+| `summaries.yaml` | `ChapterSummary` (list) | chapter_id, title, summary |
 
 ## LoadedGame
 

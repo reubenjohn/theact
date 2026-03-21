@@ -31,8 +31,7 @@ Follow the five prompt design rules defined in [Agents — Prompt Design](../arc
 
 ### Model outputs prose instead of YAML
 
-- Ensure the YAML example uses realistic content, not placeholders.
-- Strengthen the YAML hint (`YAML_HINT_*` constants in `prompts.py`).
+- Ensure the YAML example in the system prompt uses realistic content, not placeholders.
 - Check the system prompt is not too long --- the model may be losing the format instruction.
 
 ### Character breaks voice
@@ -85,10 +84,10 @@ For each run: load variant, monkey-patch prompts, run playtest, restore. Uses `r
 |--------|-------------|
 | YAML parse success | % of calls producing valid YAML |
 | Character response rate | % of turns with at least one character response |
-| Avg narration word count | Mean narrator output length |
-| Avg thinking tokens | Mean reasoning tokens per call |
-| Total tokens | All tokens consumed |
-| Mean turn latency | Average wall-clock per turn |
+| Avg turn seconds | Average wall-clock time per turn |
+| Thinking tokens (total) | Total reasoning tokens across all calls |
+| Prompt tokens | Total prompt tokens consumed |
+| Content tokens | Total response content tokens |
 | Beats hit | Total story beats triggered |
 | Quality composite | Weighted overall score |
 

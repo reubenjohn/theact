@@ -4,7 +4,7 @@ A 7B model has ~8K context tokens. A game can last 50+ turns, generating ~25K to
 
 ## Character Memory
 
-Each character has a memory file at `memories/<name>.yaml` containing:
+Each character has a memory file at `memory/<name>.yaml` containing:
 
 - **Summary** — 3-5 sentences capturing the character's current understanding of the story
 - **Key facts** — max 10 short entries tracking specific knowledge, relationships, and intentions
@@ -19,7 +19,7 @@ A dedicated memory agent updates each character's memory after every turn. The a
 sequenceDiagram
     participant E as Engine
     participant MA as Memory Agent
-    participant F as memories/maya.yaml
+    participant F as memory/maya.yaml
 
     E->>F: Read current memory
     E->>MA: Current memory + this turn's events

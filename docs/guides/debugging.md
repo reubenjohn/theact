@@ -5,7 +5,7 @@ The turn debugger lets you step through agent calls one at a time, inspect promp
 ## Quick Start
 
 ```bash
-uv run python scripts/debug_turn.py --save my-save --input "I look around."
+uv run python scripts/debug_turn.py --game lost-island --save my-save --input "I look around."
 ```
 
 This loads the game state from the specified save, then pauses before each agent call so you can inspect and interact.
@@ -17,11 +17,11 @@ This loads the game state from the specified save, then pauses before each agent
 | Step | `s` | Execute current agent call, pause at next |
 | Replay | `r` | Re-run current agent (same inputs, new LLM call) |
 | Edit | `e` | Reload prompts from disk and replay |
-| Inspect | `i` | Show prompt (`p`), response (`r`), or call record (`c`) |
+| Inspect | `i` | Show prompt (`prompt`), response (`response`), parsed output (`parsed`), stats (`stats`), or all (`all`) |
 | Skip | `k` | Skip current agent, move to next |
 | Continue | `c` | Run all remaining agents without pausing |
-| Fixture | `f` | Save prompt/response as test fixture |
-| Compare | `m` | Diff current response against previous replay |
+| Fixture | `p` | Capture prompt/response as test fixture |
+| Compare | `pa` | Compare current response against previous replay |
 | Quit | `q` | Abort and exit |
 
 ## Workflow: Fixing a Prompt
@@ -29,14 +29,14 @@ This loads the game state from the specified save, then pauses before each agent
 ```mermaid
 flowchart TD
     A["Run debugger with\nproblem input"] --> B["Step to\nfailing agent"]
-    B --> C["Inspect prompt\n(i then p)"]
-    C --> D["Inspect response\n(i then r)"]
+    B --> C["Inspect prompt\n(i then prompt)"]
+    C --> D["Inspect response\n(i then response)"]
     D --> E["Edit prompts.py\nin your editor"]
     E --> F["Press 'e' to\nreload + replay"]
     F --> G{"Output\ncorrect?"}
     G -->|No| E
-    G -->|Yes| H["Compare (m)\nagainst old output"]
-    H --> I["Capture fixture (f)\nfor regression test"]
+    G -->|Yes| H["Compare (pa)\nagainst old output"]
+    H --> I["Capture fixture (p)\nfor regression test"]
 ```
 
 ## How Edit+Replay Works
@@ -54,7 +54,7 @@ This gives a tight edit-test loop without restarting the process or re-running e
 
 ## Fixture Capture
 
-Pressing `f` calls `capture_fixture()`, which saves the full `AgentResult` (messages, raw response, parsed data, tokens) as YAML in `tests/fixtures/`.
+Pressing `p` calls `capture_fixture()`, which saves the full `AgentResult` (messages, raw response, parsed data, tokens) as YAML in `tests/fixtures/`.
 
 These fixtures feed into `test_prompt_regression.py` — debug a problem, capture the failing case, fix the prompt, and the captured fixture becomes a regression test.
 
@@ -70,8 +70,8 @@ uv run python scripts/debug_turn.py --save my-save --replay
 |-----|--------|
 | `Enter` | Next turn |
 | `p` | Previous turn |
-| `N` | Jump to turn N |
-| `d` | Diff against previous turn |
+| `j N` | Jump to turn N |
+| `d A B` | Diff turn A against turn B |
 | `q` | Quit |
 
 ## Design
@@ -83,7 +83,7 @@ The debugger wraps agents, not the engine. It requires a real game save — load
 | Symptom | What to Check | Tool |
 |---------|---------------|------|
 | Empty narrator response | System prompt too long | Context profiler |
-| Narrator outputs prose instead of YAML | YAML hint missing or weak | Inspect prompt (`i` then `p`) |
+| Narrator outputs prose instead of YAML | YAML hint missing or weak | Inspect prompt (`i` then `prompt`) |
 | Character breaks voice | Personality too vague | Check character YAML file |
 | Memory agent hallucinates facts | Turn events include wrong characters | Inspect memory prompt |
 | Game state never completes chapter | Completion condition too strict | Check chapter YAML file |
