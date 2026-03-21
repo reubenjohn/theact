@@ -1,6 +1,6 @@
 # Step 04: Game Creation Wizard
 
-> **Implementation note:** This step adds a multi-step game creation wizard to the web UI, replacing the need for the `scripts/create_game.py` terminal script. The wizard calls the existing creator APIs (`src/theact/creator/`) -- no creator logic is rewritten. All LLM calls go through the existing proposer, pipeline, validator, fixer, and writer modules. The creator uses a separate (usually larger) model configured via `CREATOR_*` env vars. If no creator config is set, the wizard shows a helpful message directing the user to configure it.
+> **Implementation note:** Step 00 must be complete. This step adds a multi-step game creation wizard to the web UI, replacing the need for the `scripts/create_game.py` terminal script. After Step 00, `app.py` is slim routing only — add the `/create` route there following the existing pattern. The wizard can use `components/html_utils.py` for rendering helpers and `components/dialogs.py` for confirmation dialogs. The wizard calls the existing creator APIs (`src/theact/creator/`) -- no creator logic is rewritten. All LLM calls go through the existing proposer, pipeline, validator, fixer, and writer modules. The creator uses a separate (usually larger) model configured via `CREATOR_*` env vars. If no creator config is set, the wizard shows a helpful message directing the user to configure it.
 
 ## 1. Overview
 
@@ -28,6 +28,8 @@ No new LLM prompts, no new agents, no changes to any creator module.
 
 **Modified files:** `src/theact/web/app.py`
 
+> **Note:** After Step 00, `app.py` is slim routing only (no business logic, no UI building). Add the `/create` route there following the existing pattern — the route handler imports and delegates to `CreatorWizard` just like other routes delegate to their respective modules.
+
 ### 2.1 New Route
 
 Register a new NiceGUI page at `/create`:
@@ -46,7 +48,7 @@ async def create_page():
 
 ### 2.2 Menu Link
 
-Add a "Create Game" button to the main menu in `_build_menu()`, placed between the banner and the "New Game" section:
+Add a 'Create Game' button to `MenuBuilder.build()` in `src/theact/web/menu.py`, placed between the banner and the "New Game" section:
 
 ```python
 # In _build_menu(), after the banner and separator:
@@ -80,6 +82,8 @@ The wizard page is self-contained. On completion or cancellation, it navigates b
 **New file:** `src/theact/web/creator_wizard.py`
 
 ### 3.1 Class Structure
+
+> **Note:** The wizard can use shared helpers from Step 00: `components/html_utils.py` for HTML escaping, table rendering, and `render_result()`; `components/dialogs.py` for confirmation dialogs (e.g., confirming before overwriting an existing game).
 
 ```python
 """Multi-step game creation wizard for the web UI.

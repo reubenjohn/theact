@@ -1,6 +1,8 @@
 # Step 06: Playtest Dashboard
 
 > **Implementation note:** This step adds a dedicated `/playtest` page to the web UI for launching, monitoring, and reviewing automated playtests. It wraps the existing `PlaytestRunner` from `src/theact/playtest/runner.py` with no changes to playtest logic. The only engine-side addition is an optional `on_turn_complete` callback parameter on `PlaytestRunner.run()` to enable real-time progress updates. This step depends on Step 05 (Settings) for LLM configuration access.
+>
+> **Step 00 refactoring:** After Step 00, the web architecture has changed. `app.py` is slim routing only — it registers page routes and delegates to page-building functions. The `components/` package provides reusable UI building blocks: `html_utils.py` (table rendering, `relative_time()`, shared utilities) and `dialogs.py` (dialog patterns). `MenuBuilder` in `menu.py` handles menu construction. New pages like `/playtest` should follow the routing and component patterns established in Step 00.
 
 ## 1. Overview
 
@@ -19,6 +21,8 @@ All playtest logic uses the existing `PlaytestRunner` -- no changes to scoring, 
 
 **Modified file:** `src/theact/web/app.py`
 
+> **Note:** After Step 00, `app.py` is slim routing only — it registers page routes and delegates to page-building functions. Add the `/playtest` route following the same pattern as existing routes.
+
 Register a new page route and add a navigation link from the main menu.
 
 ```python
@@ -29,10 +33,10 @@ async def playtest():
     await playtest_page()
 ```
 
-Add a "Playtest" button to the main menu, placed after the existing game management sections:
+Add a "Playtest" button to `MenuBuilder` in `menu.py`, placed after the existing game management sections:
 
 ```python
-# In _build_menu(), after the delete section:
+# In MenuBuilder, after the delete section:
 ui.separator()
 with ui.row().classes("w-full items-center gap-2"):
     ui.label("Tools").style(
@@ -162,7 +166,7 @@ _progress_state = {
 }
 ```
 
-> **Note:** `_progress_state` as a module-level dict is shared across all browser sessions/tabs. If two users open `/playtest` simultaneously, they see and mutate the same state. During implementation, use per-page closures (following `app.py`'s `page_state = {}` pattern) or `app.storage.tab` to scope state to each browser tab.
+> **Note:** `_progress_state` as a module-level dict is shared across all browser sessions/tabs. If two users open `/playtest` simultaneously, they see and mutate the same state. During implementation, use per-page closures (local functions inside the `@ui.page` handler, as used in `app.py`) or `app.storage.tab` to scope state to each browser tab.
 
 During execution, the panel shows:
 
@@ -453,6 +457,8 @@ The results display includes:
 3. **Per-turn table** -- turn number, elapsed time, characters responded, issues (uses `ui.table`)
 4. **LLM call statistics** -- total calls, mean latency, parse success rate, prompt tokens, retries
 5. **Per-agent breakdown table** -- agent name, calls, mean latency, parse rate, retries
+
+> **Note:** `components/html_utils.py` from Step 00 provides table rendering utilities and `relative_time()` for human-friendly timestamps. Use these when rendering the per-turn table, past report timestamps, and summary statistics rather than reimplementing formatting helpers.
 
 ## 8. Past Reports Browser
 

@@ -6,47 +6,77 @@
 
 The terminal CLI (Phase 04) provides a rich set of features beyond basic gameplay: quick-action commands, character memory inspection, save versioning with undo/history/diff, game creation, playtest launching, and diagnostics viewing. The web UI currently requires users to type slash commands for all of these, has no visual game state display, and is missing several features entirely (game creation, playtesting, diagnostics, settings).
 
-This phase expands the web UI across 8 steps:
+This phase expands the web UI across 9 steps (starting with a refactoring step):
 
 | Step | File | Summary | Depends On |
 |------|------|---------|------------|
-| 01 | [01-GameplayToolbar.md](01-GameplayToolbar.md) | Header toolbar with quick-action buttons, turn info display, input improvements | — |
-| 02 | [02-GameStateSidebar.md](02-GameStateSidebar.md) | Collapsible sidebar: character cards, chapter progress, memory viewer | 01 |
-| 03 | [03-SaveManagementAndHistory.md](03-SaveManagementAndHistory.md) | Enhanced saves table, visual save-as dialog, turn history timeline, peek/diff viewer | 01 |
-| 04 | [04-GameCreationWizard.md](04-GameCreationWizard.md) | Multi-step game creation wizard using the creator agent | 01 |
-| 05 | [05-SettingsAndConfiguration.md](05-SettingsAndConfiguration.md) | Settings page for LLM config, model selection, display preferences | — |
-| 06 | [06-PlaytestDashboard.md](06-PlaytestDashboard.md) | Launch, monitor, and review playtests from the web | 05 |
-| 07 | [07-DiagnosticsViewer.md](07-DiagnosticsViewer.md) | Call log viewer, token usage charts, error browser, diagnostics file viewer | 06 |
-| 08 | [08-PolishAndSafety.md](08-PolishAndSafety.md) | Multi-tab locking, refresh recovery, mobile layout, keyboard shortcuts, error retry | 01-07 |
+| 00 | [00-Refactoring.md](00-Refactoring.md) | **MUST BE FIRST.** Split god classes, extract shared commands, modularize components | — |
+| 01 | [01-GameplayToolbar.md](01-GameplayToolbar.md) | Header toolbar with quick-action buttons, turn info display, input improvements | 00 |
+| 02 | [02-GameStateSidebar.md](02-GameStateSidebar.md) | Collapsible sidebar: character cards, chapter progress, memory viewer | 00, 01 |
+| 03 | [03-SaveManagementAndHistory.md](03-SaveManagementAndHistory.md) | Enhanced saves table, visual save-as dialog, turn history timeline, peek/diff viewer | 00, 01 |
+| 04 | [04-GameCreationWizard.md](04-GameCreationWizard.md) | Multi-step game creation wizard using the creator agent | 00 |
+| 05 | [05-SettingsAndConfiguration.md](05-SettingsAndConfiguration.md) | Settings page for LLM config, model selection, display preferences | 00 |
+| 06 | [06-PlaytestDashboard.md](06-PlaytestDashboard.md) | Launch, monitor, and review playtests from the web | 00, 05 |
+| 07 | [07-DiagnosticsViewer.md](07-DiagnosticsViewer.md) | Call log viewer, token usage charts, error browser, diagnostics file viewer | 00, 06 |
+| 08 | [08-PolishAndSafety.md](08-PolishAndSafety.md) | Multi-tab locking, refresh recovery, mobile layout, keyboard shortcuts, error retry | 00-07 |
 
 ## File Layout
 
+After Step 00 refactoring, the web UI has a modular architecture. Steps 01-08 add to this structure.
+
 ```
+src/theact/commands/             # Shared command logic (Step 00)
+    __init__.py
+    logic.py                     # Pure functions, no UI imports
+    types.py                     # CommandResult dataclass
+
 src/theact/web/
-    __init__.py              # Updated: add new page routes
-    __main__.py              # Unchanged
-    app.py                   # Updated: navigation, menu restructure
-    session.py               # Updated: toolbar, sidebar integration
-    commands.py              # Updated: command results fed back to sidebar
-    components.py            # Updated: new UI components
-    styles.py                # Updated: new color/style constants
-    toolbar.py               # NEW: quick-action button bar
-    sidebar.py               # NEW: game state sidebar panel
-    history.py               # NEW: turn history browser components
-    creator_wizard.py        # NEW: game creation wizard page
-    settings.py              # NEW: settings page
-    playtest_dashboard.py    # NEW: playtest launcher and report viewer
-    diagnostics_viewer.py    # NEW: call log and diagnostics browser
-    safety.py                # NEW: file locking, session recovery
-tests/web/
-    test_toolbar.py          # NEW
-    test_sidebar.py          # NEW
-    test_history.py          # NEW
-    test_creator_wizard.py   # NEW
-    test_settings.py         # NEW
-    test_playtest_dashboard.py # NEW
-    test_diagnostics.py      # NEW
-    test_safety.py           # NEW
+    __init__.py                  # start_web() — unchanged
+    __main__.py                  # CLI args — unchanged
+    styles.py                    # Colors — unchanged
+
+    # Core architecture (Step 00)
+    app.py                       # Slim: page routing only
+    menu.py                      # MenuBuilder class
+    session.py                   # GameplaySession — thin orchestrator
+    state.py                     # GameSessionState — shared observable state
+    turn_runner.py               # TurnRunner — wraps run_turn()
+    streaming.py                 # StreamRenderer — routes tokens to UI
+    command_router.py            # CommandRouter — dispatches commands
+    commands.py                  # Thin web rendering layer over commands/logic
+
+    # Components package (Step 00)
+    components/
+        __init__.py              # Re-exports for backward compat
+        turn_card.py             # Turn card creation and info bar (Step 01 adds info bar)
+        message_blocks.py        # StreamingTextBlock, narrator/character/player blocks
+        thinking_panel.py        # Thinking panel component
+        system_message.py        # System message card
+        static_turn.py           # render_static_turn() for past turns
+        dialogs.py               # Reusable confirmation/input dialogs
+        html_utils.py            # HTML escaping, tables, render_result()
+
+    # Feature modules (Steps 01-08)
+    toolbar.py                   # Step 01: quick-action button bar
+    sidebar.py                   # Step 02: game state sidebar panel
+    history.py                   # Step 03: turn history browser
+    creator_wizard.py            # Step 04: game creation wizard page
+    settings.py                  # Step 05: settings page
+    playtest_dashboard.py        # Step 06: playtest launcher and report viewer
+    diagnostics_viewer.py        # Step 07: call log and diagnostics browser
+    safety.py                    # Step 08: file locking, session recovery
+
+tests/
+    test_command_logic.py        # Step 00: shared command logic tests
+    web/
+        test_toolbar.py          # Step 01
+        test_sidebar.py          # Step 02
+        test_history.py          # Step 03
+        test_creator_wizard.py   # Step 04
+        test_settings.py         # Step 05
+        test_playtest_dashboard.py # Step 06
+        test_diagnostics.py      # Step 07
+        test_safety.py           # Step 08
 ```
 
 ## What This Phase Does NOT Do
@@ -60,14 +90,18 @@ tests/web/
 ## Architecture Principles
 
 1. **Thin UI layer.** Web components call existing Python APIs. No business logic in the web layer.
-2. **Progressive enhancement.** Each step adds independently useful features. The web UI remains functional if any step is incomplete.
-3. **Shared state via `LoadedGame`.** The `GameplaySession` holds the canonical game state. Sidebar, toolbar, and history components read from it.
-4. **NiceGUI patterns.** Use `ui.refreshable` for reactive updates, `ui.timer` for polling, `app.storage.tab` for session persistence.
-5. **Same streaming callback.** All streaming goes through the existing `on_token(source, character, token, is_thinking)` pattern.
+2. **Shared observable state.** `GameSessionState` (from `state.py`) is the single source of truth. All components (sidebar, toolbar, history) read from it and register listeners. No stale references.
+3. **Modular components.** Each component type lives in its own file under `components/`. Reusable utilities (`dialogs.py`, `html_utils.py`) prevent duplication.
+4. **Shared command logic.** `commands/logic.py` contains pure functions with no UI imports. Both CLI and web are thin rendering layers over this shared logic.
+5. **Session as orchestrator.** `GameplaySession` delegates to `TurnRunner`, `StreamRenderer`, and `CommandRouter`. It does not contain business logic.
+6. **NiceGUI patterns.** Use `ui.refreshable` for reactive updates, `ui.timer` for polling, `app.storage.tab` for session persistence.
+7. **Progressive enhancement.** Each step adds independently useful features. The web UI remains functional if any step is incomplete.
 
 ## Build Order Recommendation
 
-Steps 01-03 form the core gameplay improvements and should be built first in order. Step 04 (creator wizard) and Step 05 (settings) are independent and can be built in parallel. Steps 06-07 benefit from Step 05's settings infrastructure. Step 08 is a polish pass that should come last.
+**Step 00 (refactoring) MUST come first.** It restructures the codebase so all subsequent steps work cleanly.
+
+Then: Steps 01-03 form the core gameplay improvements and should be built in order. Steps 04 and 05 are independent and can be parallelized. Steps 06-07 benefit from Step 05. Step 08 is a polish pass that should come last.
 
 ## Execution Guidance for Implementing Agents
 

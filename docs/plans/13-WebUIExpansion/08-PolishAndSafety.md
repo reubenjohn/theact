@@ -1,6 +1,8 @@
 # Step 08: Polish, Responsiveness & Safety
 
 > **Implementation note:** This is the final polish pass for the Web UI expansion. It addresses robustness gaps (multi-tab safety, refresh recovery), responsiveness (mobile/tablet layout), and UX improvements (keyboard shortcuts, error retry, loading states). These changes cut across many existing files rather than introducing major new features. The `filelock` package is added as an optional web dependency.
+>
+> **Step 00 refactoring:** After Step 00, the web architecture has changed significantly. `GameplaySession` is now a thin orchestrator delegating to `GameSessionState` (observable state with listener pattern), `TurnRunner` (turn execution), `StreamRenderer` (streaming display), and `CommandRouter` (command dispatch). `app.py` is slim routing only. `commands/logic.py` contains shared command logic as pure functions returning `CommandResult`. The `components/` package provides reusable UI building blocks. These separations affect how each polish item integrates — see per-section notes below.
 
 ---
 
@@ -86,7 +88,7 @@ When a save is loaded in the gameplay page:
 
 ```python
 async def _check_save_lock(self):
-    self._save_lock = SaveLock(self._save_path)
+    self._save_lock = SaveLock(self._state.game.save_path)
     if not self._save_lock.acquire():
         with ui.dialog() as dlg, ui.card():
             ui.label("This save is open in another tab.")
@@ -126,6 +128,8 @@ web = ["nicegui>=3.9.0", "filelock>=3.12"]
 
 Use NiceGUI's `app.storage.tab` to persist session state across browser refreshes. This storage is backed by a server-side dict keyed by a tab-specific cookie, so it survives page reloads.
 
+> **Note:** After Step 00, session state is centralized in `GameSessionState` (in `state.py`) with an observable listener pattern. This makes it cleaner to serialize/restore — the state to persist is well-defined in one place rather than scattered across the session object. Write the relevant `GameSessionState` fields to `app.storage.tab` and restore them on refresh.
+
 ### Stored state
 
 On entering gameplay, write to `app.storage.tab`:
@@ -151,7 +155,8 @@ async def index():
         save_path = Path(f"saves/{save_id}")
         if save_path.exists():
             # Restore session — skip menu, go directly to gameplay
-            await enter_gameplay(save_id, show_thinking=tab.get("show_thinking", False))
+            game = load_save(save_id)
+            await enter_gameplay(game, show_thinking=tab.get("show_thinking", False))
             return
         else:
             # Save no longer exists — clear stale state, fall through to menu
@@ -252,6 +257,8 @@ The menu page currently uses side-by-side columns for "Load Game" and "New Game.
 
 ## 5. Keyboard Shortcuts
 
+> **Note:** After Step 00, `GameplaySession` is a thin orchestrator. Keyboard handlers should call methods on the session, which delegates to the appropriate component: `CommandRouter` for commands like undo and save-as, `TurnRunner` for turn-related actions, and `GameSessionState` for state toggles like sidebar visibility. Do not put business logic directly in keyboard handlers.
+
 ### Implementation
 
 Use NiceGUI's `ui.keyboard` component to listen for key events:
@@ -283,7 +290,7 @@ async def _handle_key(self, e):
 | Shortcut | Action |
 |----------|--------|
 | `Enter` | Submit input (default textarea behavior) |
-| `Ctrl+Z` | Undo last turn (with confirmation dialog) |
+| `Ctrl+Z` | Undo last turn (with confirmation dialog via `components/dialogs.py`'s `confirm_dialog()`, then delegates to `self._command_router.execute("undo", ...)`) |
 | `Ctrl+S` | Open save-as dialog |
 | `Ctrl+H` | Toggle history browser |
 | `Ctrl+B` | Toggle sidebar |
@@ -314,20 +321,22 @@ document.addEventListener('keydown', function(e) {
 
 When `run_turn()` throws an exception during streaming, the user should be able to retry without retyping their input.
 
+> **Note:** After Step 00, `TurnRunner` handles turn execution and `GameSessionState` holds the game state. Retry logic calls `state.reload_game()` to discard partial mutations, then calls `TurnRunner.run()` again with the same player input.
+
 ### Current behavior
 
 The gameplay page already stores `_last_player_input`. Errors during streaming are caught and displayed in the turn card.
 
 ### Enhanced behavior
 
-In `_play_turn()`, after catching an error:
+In the turn execution flow, after catching an error:
 
 ```python
 async def _play_turn(self, player_input: str):
     self._last_player_input = player_input
+    renderer = StreamRenderer(self._turn_card)
     try:
-        async for chunk in run_turn(self._session, player_input):
-            self._append_to_turn_card(chunk)
+        await self._turn_runner.run(player_input, on_token=renderer.route_token)
     except Exception as e:
         self._show_turn_error(str(e), player_input)
 
@@ -342,14 +351,16 @@ def _show_turn_error(self, error_msg: str, player_input: str):
 
 async def _retry_turn(self, player_input: str):
     # Reload game state from disk to discard partial mutations
-    self._session = await reload_session(self._session.save_path)
+    # After Step 00: use state.reload_game() then TurnRunner.run()
+    self._state.reload_game()
     # Remove the error turn card
     self._remove_last_turn_card()
-    # Replay the turn
-    await self._play_turn(player_input)
+    # Replay the turn via TurnRunner with a fresh StreamRenderer
+    renderer = StreamRenderer(self._turn_card)
+    await self._turn_runner.run(player_input, on_token=renderer.route_token)
 ```
 
-Key detail: **reload game state from disk before retry.** A failed turn may have partially mutated in-memory state (e.g., narrator output written but character agents not yet run). Reloading from disk ensures a clean slate since the engine only persists state after a fully successful turn.
+Key detail: **reload game state from disk before retry.** A failed turn may have partially mutated in-memory state (e.g., narrator output written but character agents not yet run). Calling `state.reload_game()` ensures a clean slate since the engine only persists state after a fully successful turn. Then `TurnRunner.run()` re-executes the turn.
 
 ---
 
@@ -392,11 +403,13 @@ Use `ui.spinner("dots", size="sm")` for inline indicators and `ui.spinner("dots"
 
 After streaming completes, the engine runs memory updates and game state checks in parallel via `asyncio.gather`. This can take a few seconds. Currently the UI shows nothing during this phase.
 
+> **Note:** After Step 00, `StreamRenderer` is a separate component from the session. It handles rendering streamed tokens into the UI. `TurnRunner` handles turn execution. The "Updating world state..." indicator should be shown between `StreamRenderer.finish()` (when streaming display is complete) and `TurnRunner.run()` returning (when memory updates and game state checks are done). The session orchestrates the handoff between these two components.
+
 ### Implementation
 
 Add a subtle indicator below the turn card after streaming finishes but before `run_turn()` returns:
 
-> **Note:** `run_turn()` is a single function — there is no separate `run_turn_stream` / `run_turn_post` split. The recommended approach is to use the streaming callback (`on_token`) to detect when the last narrative token has been received, then show the "Updating world state..." indicator between the last token arriving and `run_turn()` returning (which signals that memory updates and game state checks are complete).
+> **Note:** `run_turn()` is a single function — there is no separate `run_turn_stream` / `run_turn_post` split. The recommended approach is to use the streaming callback (`on_token`) to detect when the last narrative token has been received, then show the "Updating world state..." indicator between the last token arriving and `run_turn()` returning (which signals that memory updates and game state checks are complete). In the Step 00 architecture, `StreamRenderer.finish()` marks the end of streaming display, and `TurnRunner.run()` returning marks the completion of all post-turn processing.
 
 ```python
 async def _play_turn(self, player_input: str):

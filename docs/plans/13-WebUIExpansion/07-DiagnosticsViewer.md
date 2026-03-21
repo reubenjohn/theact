@@ -1,6 +1,8 @@
 # Step 07: Diagnostics & Observability Viewer
 
 > **Implementation note:** This step adds a dedicated `/diagnostics` page to the web UI that surfaces the project's existing observability infrastructure (Phase 09) in a browser-based interface. It reads from `LLMCallLog` (in-memory call records), `DiagnosticsWriter` artifacts on disk, and `ParseFailureType` error categories. No engine changes are required — the viewer is a read-only consumer of data already produced by the turn engine, call logger, and diagnostics writer.
+>
+> **Step 00 refactoring:** After Step 00, the web architecture has changed. `app.py` is slim routing only. `GameplaySession` is a thin orchestrator delegating to `GameSessionState`, `TurnRunner`, `StreamRenderer`, and `CommandRouter`. The `components/` package provides reusable building blocks: `html_utils.py` (table rendering, `relative_time()`) and `dialogs.py`. The debug mode toggle should update `GameSessionState.debug_mode`, which is read by `TurnRunner` when executing turns. Charts use `ui.echart` (Apache ECharts via NiceGUI).
 
 ## 1. Overview
 
@@ -19,6 +21,8 @@ This step adds a new page at `/diagnostics` with a tabbed interface for viewing 
 
 **Modified file:** `src/theact/web/app.py`
 
+> **Note:** After Step 00, `app.py` is slim routing only — it registers page routes and delegates to page-building functions. Add the `/diagnostics` route following the same pattern as existing routes.
+
 Register a new page route:
 
 ```python
@@ -36,11 +40,11 @@ Navigation entry points:
 - **Back navigation** — The diagnostics page includes a "Back to Menu" link at the top.
 
 ```python
-# In app.py menu builder:
+# In MenuBuilder (menu.py):
 ui.button("Diagnostics", icon="analytics",
           on_click=lambda: ui.navigate.to("/diagnostics")).props("flat dense")
 
-# In session.py gameplay header:
+# In GameplaySession.build() (session.py):
 ui.button(icon="analytics",
           on_click=lambda: ui.navigate.to("/diagnostics", new_tab=True)
           ).tooltip("Open diagnostics").props("flat dense")
@@ -109,6 +113,8 @@ def build_diagnostics_page(save_id: str = "") -> None:
 ```
 
 ## 4. Call Log Tab
+
+> **Note:** `components/html_utils.py` from Step 00 provides table rendering utilities. Use these for the call log table and summary row rather than reimplementing formatting helpers.
 
 Displays all `LLMCallRecord` entries in a filterable, sortable table.
 
@@ -518,25 +524,29 @@ Add an option in the gameplay session to enable debug mode, which causes `run_tu
 
 ### Toggle location
 
-**Modified file:** `src/theact/web/session.py`
+**Modified file:** `src/theact/web/state.py` and `src/theact/web/session.py`
 
-Add a `debug_mode` flag to `GameplaySession`:
+> **Note:** After Step 00, `GameplaySession` is a thin orchestrator. Observable state lives in `GameSessionState` (in `state.py`), and turn execution is handled by `TurnRunner`. The debug mode flag should be stored in `GameSessionState` so that `TurnRunner` can read it when executing turns.
+
+Add a `debug_mode` field to `GameSessionState`:
 
 ```python
-class GameplaySession:
+class GameSessionState:
     def __init__(self, ...) -> None:
         ...
         self.debug_mode = False
 ```
 
-Add a toggle in the gameplay header bar (alongside the existing "Thinking" switch):
+> **Note:** `debug_mode` is already a field on the `GameSessionState` dataclass from Step 00 — no additional `state.py` changes are needed. The snippet above is shown for context only.
+
+Add a toggle in the gameplay header bar (alongside the existing "Thinking" switch). The toggle updates `GameSessionState.debug_mode`:
 
 ```python
 def _build_header(self) -> None:
     with ui.row().classes("w-full items-center p-2").style("border-bottom: 1px solid #444;"):
         # ... existing header label ...
 
-        self._debug_switch = ui.switch("Diagnostics", value=self.debug_mode).style(
+        self._debug_switch = ui.switch("Diagnostics", value=self.state.debug_mode).style(
             "color: #999;"
         )
         self._debug_switch.on_value_change(self._on_debug_toggle)
@@ -545,23 +555,24 @@ def _build_header(self) -> None:
 
 
 def _on_debug_toggle(self, e) -> None:
-    self.debug_mode = e.value
-    state = "enabled" if e.value else "disabled"
-    ui.notify(f"Debug diagnostics {state}.", type="info")
+    self.state.debug_mode = e.value
+    state_label = "enabled" if e.value else "disabled"
+    ui.notify(f"Debug diagnostics {state_label}.", type="info")
 ```
 
 ### Passing debug to run_turn
 
-In `_play_turn()`, pass the debug flag:
+`TurnRunner` reads `state.debug_mode` when executing turns:
 
 ```python
+# In TurnRunner.run():
 result = await run_turn(
-    self.game,
+    self.state.game,
     player_input,
-    self.llm_config,
+    self.state.llm_config,
     on_token=on_token,
     call_log=self._call_log,     # see Section 9
-    debug=self.debug_mode,
+    debug=self.state.debug_mode,
 )
 ```
 
@@ -579,27 +590,29 @@ self._debug_switch.tooltip(
 
 ### In-session accumulation
 
-Add an `LLMCallLog` instance to `GameplaySession` and pass it to `run_turn()`:
+Add an `LLMCallLog` instance to `TurnRunner` and pass it to `run_turn()`:
+
+> **Note:** `LLMCallLog` lives on `TurnRunner` (as `self._turn_runner.call_log`), not on the session directly. `GameplaySession` accesses it via `self._turn_runner.call_log` when needed (e.g., for persistence or passing to the diagnostics page).
 
 ```python
 from theact.llm.call_log import LLMCallLog
 
-class GameplaySession:
+class TurnRunner:
     def __init__(self, ...) -> None:
         ...
-        self._call_log = LLMCallLog()
+        self.call_log = LLMCallLog()
 ```
 
-Pass it to `run_turn`:
+`TurnRunner.run()` passes the call log to `run_turn`:
 
 ```python
 result = await run_turn(
-    self.game,
+    self._state.game,
     player_input,
-    self.llm_config,
+    self._state.llm_config,
     on_token=on_token,
-    call_log=self._call_log,
-    debug=self.debug_mode,
+    call_log=self.call_log,
+    debug=self._state.debug_mode,
 )
 ```
 
@@ -607,26 +620,26 @@ result = await run_turn(
 
 To survive page reloads and session restarts, dump the call log to disk periodically:
 
-- **On turn completion:** After each successful turn, call `self._call_log.dump_yaml(self.game.save_path / "call_log.yaml")`.
-- **On session load:** When `GameplaySession.__init__` loads a save, check for `saves/{save-id}/call_log.yaml`. If present, load it to restore the call log.
+- **On turn completion:** After each successful turn, call `self._turn_runner.call_log.dump_yaml(self._state.game.save_path / "call_log.yaml")`.
+- **On session load:** When loading a save, check for `saves/{save-id}/call_log.yaml`. If present, load it to restore the call log on `TurnRunner`.
 
 ```python
 from dataclasses import fields as dataclass_fields
 
 def _load_call_log(self) -> None:
     """Load persisted call log if available."""
-    log_path = self.game.save_path / "call_log.yaml"
+    log_path = self._state.game.save_path / "call_log.yaml"
     if log_path.exists():
         import yaml
         from theact.llm.call_log import LLMCallRecord
         with open(log_path) as f:
             data = yaml.safe_load(f) or []
         for entry in data:
-            self._call_log.log(LLMCallRecord(**entry))
+            self._turn_runner.call_log.log(LLMCallRecord(**entry))
 
 def _persist_call_log(self) -> None:
     """Save call log to disk."""
-    self._call_log.dump_yaml(self.game.save_path / "call_log.yaml")
+    self._turn_runner.call_log.dump_yaml(self._state.game.save_path / "call_log.yaml")
 ```
 
 Call `_load_call_log()` at the end of `__init__` and `_persist_call_log()` at the end of each successful `_play_turn()`.
@@ -666,28 +679,25 @@ Tests use the same Playwright-based browser testing pattern as existing web test
 ```python
 import pytest
 from pathlib import Path
-from playwright.async_api import Page, expect
+from playwright.sync_api import expect
 
 
-@pytest.mark.asyncio
-async def test_diagnostics_page_accessible(page: Page, web_server: str):
+def test_diagnostics_page_accessible(page, web_server):
     """Diagnostics page loads at /diagnostics."""
-    await page.goto(f"{web_server}/diagnostics")
+    page.goto(f"{web_server}/diagnostics")
     # Page should load without error
     heading = page.locator("text=Diagnostics & Observability")
-    await expect(heading).to_be_visible()
+    expect(heading).to_be_visible()
 
 
-@pytest.mark.asyncio
-async def test_diagnostics_empty_state(page: Page, web_server: str):
+def test_diagnostics_empty_state(page, web_server):
     """With no call data, shows an appropriate message."""
-    await page.goto(f"{web_server}/diagnostics")
+    page.goto(f"{web_server}/diagnostics")
     empty_msg = page.locator("text=No LLM call data available")
-    await expect(empty_msg).to_be_visible()
+    expect(empty_msg).to_be_visible()
 
 
-@pytest.mark.asyncio
-async def test_diagnostics_tabs_present(page: Page, web_server: str, tmp_path: Path):
+def test_diagnostics_tabs_present(page, web_server, tmp_path):
     """All four tabs are rendered when call log data exists.
 
     Note: The test fixture must provide a save with a call_log.yaml file,
@@ -705,18 +715,17 @@ async def test_diagnostics_tabs_present(page: Page, web_server: str, tmp_path: P
         "  parse_result: success\n  parse_attempts: 1\n"
     )
 
-    await page.goto(f"{web_server}/diagnostics?save=test-save")
+    page.goto(f"{web_server}/diagnostics?save=test-save")
     for tab_name in ["Call Log", "Token Usage", "Diagnostics Files", "Error Browser"]:
         tab = page.locator(f"text={tab_name}")
-        await expect(tab).to_be_visible()
+        expect(tab).to_be_visible()
 
 
-@pytest.mark.asyncio
-async def test_diagnostics_link_in_menu(page: Page, web_server: str):
+def test_diagnostics_link_in_menu(page, web_server):
     """Menu page has a link/button to diagnostics."""
-    await page.goto(web_server)
+    page.goto(web_server)
     diag_button = page.locator("text=Diagnostics")
-    await expect(diag_button).to_be_visible()
+    expect(diag_button).to_be_visible()
 ```
 
 Additional tests to add once the full implementation is in place:

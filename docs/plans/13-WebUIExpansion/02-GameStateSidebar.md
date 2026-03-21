@@ -1,6 +1,6 @@
 # Step 02: Game State Sidebar
 
-> **Implementation note:** This step adds a collapsible right sidebar to the gameplay view that persistently displays character info, chapter progress, and game metadata. It replaces the need for `/memory`, `/status`, and `/conversation` slash commands during web gameplay. All sidebar sections update reactively after each turn using NiceGUI's `ui.refreshable` pattern.
+> **Implementation note:** Step 00 must be complete. The sidebar reads from `GameSessionState` (shared observable state) and registers as a listener for automatic updates. This step adds a collapsible right sidebar to the gameplay view that persistently displays character info, chapter progress, and game metadata. It replaces the need for `/memory`, `/status`, and `/conversation` slash commands during web gameplay. All sidebar sections update reactively after each turn via the state listener pattern.
 
 ## 1. Overview
 
@@ -26,21 +26,38 @@ The sidebar:
 Create a `GameStateSidebar` class that owns all sidebar rendering and refresh logic.
 
 ```python
-class GameStateSidebar:
-    """Collapsible right sidebar showing live game state."""
+from theact.web.state import GameSessionState
 
-    def __init__(self, game: LoadedGame, character_list: list[str]) -> None:
-        self.game = game
-        self.character_list = character_list  # list(game.characters.keys())
+class GameStateSidebar:
+    """Collapsible right sidebar showing live game state.
+
+    Reads all data from GameSessionState (shared observable state from Step 00).
+    Registers as a state listener so it refreshes automatically after each turn
+    or game reload — no manual update calls needed from the session.
+    """
+
+    def __init__(self, state: GameSessionState) -> None:
+        self._state = state        # access game via self._state.game
         self._visible = True       # toggled by toolbar button
         self._container = None     # reference to the outer ui.column
+
+    @property
+    def character_list(self) -> list[str]:
+        return self._state.character_list
+
+    @property
+    def game(self):
+        return self._state.game
 
     def build(self, parent: ui.element) -> None:
         """Create the sidebar DOM within `parent`.
 
-        Calls each @ui.refreshable method once for initial render.
+        Registers as a state listener and calls each @ui.refreshable
+        method once for initial render.
         """
         ...
+        # Register for automatic updates when state changes
+        self._state.add_listener(self.refresh)
         # Initial render of refreshable sections
         self._refresh_characters()
         self._refresh_chapter()
@@ -198,22 +215,24 @@ def _refresh_info(self) -> None:
 
 ## 6. Layout Integration
 
-**Modified file:** `src/theact/web/session.py`
+**Modified file:** `src/theact/web/session.py` (the slim orchestrator from Step 00)
+
+After Step 00, `session.py` (`GameplaySession`) is a thin orchestrator (~120 lines) that delegates to `GameSessionState`, `TurnRunner`, `StreamRenderer`, and `CommandRouter`. The sidebar integrates into this pattern by receiving the shared `GameSessionState` and registering as a listener.
 
 The gameplay view currently renders a single chat column. Change it to a two-column flexbox layout.
 
 **Note:** The existing `max-w-3xl` (768px) constraint on both `app.py` and `session.py` containers must be widened to `max-w-6xl` or removed when the sidebar is present. The sidebar adds 300px and the chat column needs room to remain usable.
 
 ```python
-# In the gameplay page builder:
+# In the gameplay page builder (session.py orchestrator):
 with ui.row().classes('w-full h-full'):
     # Main chat area — takes remaining space
     with ui.column().classes('flex-grow h-full overflow-hidden'):
         # existing chat log + input
         ...
 
-    # Sidebar — fixed width
-    sidebar = GameStateSidebar(game=loaded_game)
+    # Sidebar — reads from shared GameSessionState
+    sidebar = GameStateSidebar(state=self._state)
     with ui.column().classes('w-[300px] min-w-[300px] h-full border-l border-gray-700 overflow-y-auto bg-gray-900 p-3'):
         sidebar.build(parent=ui.element.default_slot.parent)
 ```
@@ -250,12 +269,7 @@ Specific update triggers:
 
 Because all three `@ui.refreshable` methods re-read from `self.game` (which is a reference to the live `LoadedGame`), calling `sidebar.refresh()` after the game state is persisted is sufficient — no explicit data passing needed.
 
-**Important:** After `_reload_game()` (e.g., undo or retry), `self.game` on the session is a **new** object while the sidebar still holds the **old** reference. The session must update the sidebar's game reference before calling refresh:
-
-```python
-self._sidebar.game = self.game  # update reference after reload
-self._sidebar.refresh()
-```
+**Note:** After Step 00, the sidebar reads from `GameSessionState` and registers as a listener via `self._state.add_listener(self.refresh)`. When the game is reloaded (e.g., undo or retry), updating `self._state.game` automatically triggers all listeners — no manual reference update or explicit `sidebar.refresh()` call is needed from the session.
 
 ## 8. Responsive Behavior
 

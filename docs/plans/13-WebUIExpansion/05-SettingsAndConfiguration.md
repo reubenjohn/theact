@@ -1,6 +1,8 @@
 # Step 05: Settings & Configuration
 
 > **Implementation note:** This step adds a dedicated settings page at `/settings` where users can view and modify LLM configuration, creator model configuration, and display preferences from the web UI. Currently all configuration is done via environment variables in a `.env` file, requiring a manual edit and server restart to change anything. This step introduces a `settings.yaml` persistence layer that sits on top of `.env`, allowing web-configurable settings without touching secrets files. NiceGUI `password=True` inputs provide visual masking of API keys in the browser.
+>
+> **Step 00 refactoring:** After Step 00, the web architecture has changed. `GameplaySession` is now a thin orchestrator delegating to `GameSessionState`, `TurnRunner`, `StreamRenderer`, and `CommandRouter`. `app.py` is slim routing only. The `components/` package provides reusable UI building blocks including `html_utils.py` and `dialogs.py`. The `commands/logic.py` module contains shared command logic as pure functions returning `CommandResult`. `MenuBuilder` is a dedicated class in `menu.py`. All new pages (including `/settings`) should follow the patterns established in Step 00.
 
 ## 1. Overview
 
@@ -20,6 +22,8 @@ This step adds:
 
 **Modified file:** `src/theact/web/app.py`
 
+> **Note:** After Step 00, `app.py` is slim routing only — it registers page routes and delegates to page-building functions. It does not contain UI construction logic. Add the `/settings` route following the same pattern as the existing `/` and `/play` routes.
+
 Register a new page route in `setup_app()`:
 
 ```python
@@ -32,19 +36,21 @@ async def settings_page():
 
 Add a navigation link to the settings page from two locations:
 
-1. **Menu page** — Add a gear icon button in the banner area or footer:
+1. **Menu page** — Add a gear icon button in `MenuBuilder` (in `menu.py`):
    ```python
    ui.button(icon="settings", on_click=lambda: ui.navigate.to("/settings")).props(
        "flat dense"
    ).tooltip("Settings")
    ```
 
-2. **Gameplay toolbar** (from Step 01) — Add a settings button:
+2. **Gameplay toolbar** (from Step 01) — Add a settings button. Note that the session is now a thin orchestrator; toolbar buttons are part of the session's UI setup:
    ```python
    ui.button(icon="settings", on_click=lambda: ui.navigate.to("/settings")).props(
        "flat dense"
    ).tooltip("Settings")
    ```
+
+> **Note:** `components/html_utils.py` and `components/dialogs.py` from Step 00 are available for use in the settings page. `html_utils.py` provides shared rendering utilities; `dialogs.py` provides dialog patterns (e.g., for the "Test Connection" result display or confirmation dialogs).
 
 ## 3. Settings Page Layout
 
@@ -565,7 +571,7 @@ Settings fall into two categories based on when they take effect:
 2. `_collect_form_values()` reads all form fields into a `SettingsData` instance. This function must be implemented to read `.value` from each NiceGUI field reference in `llm_fields`, `creator_fields`, and `display_fields`, and construct a `SettingsData` instance from them. It is not defined in the code samples above and must be added during implementation.
 3. `save_settings()` writes to `settings.yaml`
 4. `ui.notify("Settings saved. LLM changes will take effect on next session.", type="positive")`
-5. Display preferences are applied to `app.storage.tab` so they persist for the current browser tab and are read by `GameplaySession` on next build
+5. Display preferences are applied to `app.storage.tab` so they persist for the current browser tab and are loaded into `GameSessionState` on next session initialization
 
 **LLM config is NOT hot-reloaded** into an active gameplay session. The `LLMConfig` instance is created once when the gameplay page loads (in `app.py`'s `index()` handler) and passed to `GameplaySession`. Changing LLM settings mid-game requires returning to the menu and re-entering gameplay.
 

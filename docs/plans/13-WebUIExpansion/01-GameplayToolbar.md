@@ -1,6 +1,6 @@
 # Step 01: Gameplay Toolbar & Quick Actions
 
-> **Implementation note:** This step has no prerequisites beyond the existing web UI (Phase 07). All commands already exist in `src/theact/web/commands.py` — this step wraps them in clickable buttons and adds a turn info display. No engine changes are needed. The existing `TurnResult` data model already contains all fields used by the turn info bar (mood, beats_hit, chapter_advanced). NiceGUI patterns used here (icon buttons, dialogs, expansion panels) are already established in `src/theact/web/app.py` and `src/theact/web/components.py`.
+> **Implementation note:** Step 00 must be complete. This step builds on the modular architecture: `GameplaySession` as orchestrator, `GameSessionState` for shared state, and `components/` package. All commands already exist in `src/theact/web/commands/logic.py` (pure functions returning `CommandResult`) — this step wraps them in clickable buttons and adds a turn info display. No engine changes are needed. The existing `TurnResult` data model already contains all fields used by the turn info bar (mood, beats_hit, chapter_advanced). NiceGUI patterns used here (icon buttons, dialogs, expansion panels) are already established in `src/theact/web/app.py` and `src/theact/web/components/`.
 
 ## 1. Overview
 
@@ -19,7 +19,7 @@ This step adds three things:
 - No sidebar or game state panel — that is Step 02.
 - No turn history timeline or peek/diff viewer — that is Step 03.
 - No changes to the turn engine, agents, or data models.
-- No changes to `src/theact/web/commands.py` function signatures — the toolbar calls existing functions.
+- No changes to `src/theact/commands/logic.py` or `src/theact/web/command_router.py`.
 - No new slash commands — existing slash commands continue to work unchanged.
 - No mobile-specific layout — that is Step 08.
 
@@ -54,7 +54,8 @@ class GameplayToolbar:
         on_retry: Async callback for retry action.
         on_save_as: Async callback for save-as action. Receives new save name.
         on_history: Callback to open the history panel.
-        is_processing: Callable that returns True when a turn is in progress.
+        is_processing: Reads from `GameSessionState.processing` (the shared
+            observable state from Step 00) instead of a lambda.
     """
 
     def __init__(
@@ -63,7 +64,7 @@ class GameplayToolbar:
         on_retry: Callable[[], Awaitable[None]],
         on_save_as: Callable[[str], Awaitable[None]],
         on_history: Callable[[], None],
-        is_processing: Callable[[], bool],
+        is_processing: Callable[[], bool],  # reads state.processing
     ) -> None:
         self._on_undo = on_undo
         self._on_retry = on_retry
@@ -183,7 +184,7 @@ After each turn completes, display a color-coded info line inside the turn card 
 
 ### 3.2 Component Function
 
-Add a new function to `src/theact/web/components.py`:
+Add a new function to `src/theact/web/components/turn_card.py`:
 
 ```python
 def create_turn_info_bar(
@@ -357,7 +358,7 @@ The input field currently shows a static "What do you do?" placeholder. Enhance 
 ```python
 def _get_placeholder(self) -> str:
     """Return a contextual placeholder for the input field."""
-    if self.game.state.turn == 0:
+    if self._state.game.state.turn == 0:
         return "The story begins..."
     if self._last_player_input:
         return "What do you do next?"
@@ -399,7 +400,7 @@ self._input_field.on(
 
 ```python
 from theact.web.toolbar import GameplayToolbar
-from theact.web.components import create_turn_info_bar
+from theact.web.components.turn_card import create_turn_info_bar
 ```
 
 **Add toolbar to `__init__`:**
@@ -433,7 +434,7 @@ def build(self, container: ui.element) -> None:
                 on_retry=self._toolbar_retry,
                 on_save_as=self._toolbar_save_as,
                 on_history=self._toolbar_history,
-                is_processing=lambda: self._processing,
+                is_processing=lambda: self._state.processing,  # reads GameSessionState
             )
             self._toolbar.build(self._gameplay_container)
 
@@ -454,13 +455,19 @@ Add these methods to `GameplaySession`:
 
 ```python
 async def _toolbar_undo(self, steps: int = 1) -> None:
-    """Toolbar undo callback: undo N turns and re-render."""
-    reloaded, message = cmd_undo_web(self.game, [str(steps)])
-    if reloaded is None:
-        ui.notify(message, type="warning")
+    """Toolbar undo callback: undo N turns and re-render.
+
+    Uses CommandRouter or commands/logic.cmd_undo() which returns a
+    CommandResult. Access the game via self._state.game (GameSessionState).
+    """
+    from theact.commands.logic import cmd_undo
+    result = cmd_undo(self._state.game, [str(steps)])
+    if not result.success:
+        ui.notify(result.message, type="warning")
         return
-    self.game = reloaded
-    ui.notify(message, type="info")
+    if result.data:
+        self._state.game = result.data
+    ui.notify(result.message, type="info")
     self._chat_area.clear()
     self._render_history()
     self._update_header()
@@ -470,15 +477,22 @@ async def _toolbar_retry(self) -> None:
     await self._cmd_retry()
 
 async def _toolbar_save_as(self, name: str) -> None:
-    """Toolbar save-as callback: fork save to new name."""
-    cmd_save_as_web(self.game, [name])
+    """Toolbar save-as callback: fork save to new name.
+
+    Uses commands/logic.cmd_save_as() via self._state.game.
+    """
+    from theact.commands.logic import cmd_save_as
+    cmd_save_as(self._state.game, [name])
 
 def _toolbar_history(self) -> None:
     """Toolbar history callback: show history in chat area.
 
     In Step 03, this will open the history panel instead.
     """
-    cmd_history_web(self._chat_area, self.game)
+    from theact.commands.logic import cmd_history
+    from theact.web.components.html_utils import render_result
+    result = cmd_history(self._state.game)
+    render_result(self._chat_area, result)
     if self._chat_scroll:
         self._chat_scroll.scroll_to(percent=1.0)
 ```
@@ -489,7 +503,7 @@ Modify `_lock_input` and `_unlock_input` to also toggle the toolbar:
 
 ```python
 def _lock_input(self) -> None:
-    self._processing = True
+    self._state.processing = True
     if self._input_field:
         self._input_field.disable()
     if self._send_button:
@@ -498,7 +512,7 @@ def _lock_input(self) -> None:
         self._toolbar.set_enabled(False)
 
 def _unlock_input(self) -> None:
-    self._processing = False
+    self._state.processing = False
     if self._input_field:
         self._input_field.enable()
         self._input_field.run_method("focus")
@@ -528,6 +542,8 @@ Remove the old `info_parts` list assembly and the `ui.label(" | ".join(info_part
 ---
 
 ## 6. Confirmation Dialogs
+
+> **Note:** Step 00 provides reusable dialog builders in `components/dialogs.py`. The toolbar should use `number_input_dialog()` for the undo step count and `text_input_dialog()` for save-as name input instead of building custom dialogs from scratch. The examples below show the inline approach for reference, but prefer the shared builders.
 
 ### 6.1 Undo Confirmation Dialog
 
@@ -763,10 +779,12 @@ All of the following must be true after implementation:
 
 ## 9. File Change Summary
 
+> **Note:** Step 00's `components/dialogs.py` provides the dialog infrastructure (confirm, text input, number input builders). The toolbar dialogs in Section 6 should use these shared builders rather than duplicating the pattern.
+
 | File | Action | Description |
 |------|--------|-------------|
 | `src/theact/web/toolbar.py` | **NEW** | `GameplayToolbar` class with icon buttons and dialog methods |
 | `src/theact/web/session.py` | MODIFY | Import toolbar, instantiate in `build()`, add callback methods, integrate with lock/unlock, replace inline turn info with `create_turn_info_bar` |
-| `src/theact/web/components.py` | MODIFY | Add `create_turn_info_bar()` function |
+| `src/theact/web/components/turn_card.py` | MODIFY | Add `create_turn_info_bar()` function |
 | `src/theact/web/styles.py` | MODIFY | Add `BEAT_COLOR`, `CHAPTER_ADVANCE_COLOR`, `MOOD_COLOR` constants |
 | `tests/web/test_toolbar.py` | **NEW** | Playwright browser tests for toolbar buttons and dialogs |

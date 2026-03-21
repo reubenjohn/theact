@@ -1,6 +1,6 @@
 # Step 03: Save Management & History Browser
 
-> **Implementation note:** This step depends on Step 01 (Gameplay Toolbar) for the History button in the toolbar. It modifies `src/theact/web/app.py` (enhanced saves table), creates `src/theact/web/history.py` (turn history browser), and adds tests in `tests/web/test_history.py`. All git operations use existing APIs in `src/theact/versioning/git_save.py` -- no engine changes required.
+> **Implementation note:** Step 00 must be complete. This step depends on Step 01 (Gameplay Toolbar) for the History button in the toolbar. After Step 00, the save table lives in `menu.py` (`MenuBuilder` class), not `app.py` — `app.py` is now slim routing only. The `relative_time()` helper is already available in `components/html_utils.py`. This step modifies `src/theact/web/menu.py` (enhanced saves table), creates `src/theact/web/history.py` (turn history browser), and adds tests in `tests/web/test_history.py`. All git operations use existing APIs in `src/theact/versioning/git_save.py` -- no engine changes required.
 
 ---
 
@@ -17,7 +17,9 @@ This step:
 
 ## 2. Enhanced Saves Table
 
-**File:** `src/theact/web/app.py` (modify `_build_saves_table`)
+**File:** `src/theact/web/menu.py` (modify `_build_saves_table` in `MenuBuilder`)
+
+> **Note:** After Step 00, the save table is in `menu.py` (`MenuBuilder` class), not `app.py`. The `relative_time()` helper already exists in `components/html_utils.py` — import it from there instead of defining a new one.
 
 Replace the current row-based saves table with a card-based layout. Each save gets a card with richer information and multiple action buttons.
 
@@ -37,33 +39,13 @@ Action buttons per card:
 
 ### 2.2 Relative Time Helper
 
-Add a helper function to compute relative time strings:
+Step 00 already provides `relative_time()` in `components/html_utils.py`. Import it instead of defining a new helper:
 
 ```python
-# In app.py or a shared utils module
-
-from datetime import datetime, timezone
-
-def _relative_time(timestamp: float) -> str:
-    """Convert a Unix timestamp to a human-readable relative time string."""
-    now = datetime.now(tz=timezone.utc)
-    dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-    delta = now - dt
-
-    seconds = int(delta.total_seconds())
-    if seconds < 60:
-        return "just now"
-    minutes = seconds // 60
-    if minutes < 60:
-        return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
-    hours = minutes // 60
-    if hours < 24:
-        return f"{hours} hour{'s' if hours != 1 else ''} ago"
-    days = hours // 24
-    if days < 30:
-        return f"{days} day{'s' if days != 1 else ''} ago"
-    return dt.strftime("%Y-%m-%d")
+from theact.web.components.html_utils import relative_time
 ```
+
+The function signature is `relative_time(timestamp: float) -> str` and returns human-readable strings like "just now", "2 hours ago", "3 days ago".
 
 ### 2.3 Card-Based Save Layout
 
@@ -106,7 +88,7 @@ def _build_save_card(
     """Build a single save card with info and action buttons."""
     save_id = save_info["id"]
     modified = save_info.get("last_modified", 0)
-    time_str = _relative_time(modified) if modified > 0 else "unknown"
+    time_str = relative_time(modified) if modified > 0 else "unknown"
 
     with ui.card().classes("w-full").style(
         "background: #2a2a2a; border: 1px solid #444; padding: 12px;"
@@ -159,7 +141,7 @@ def _build_save_card(
 
 ### 2.5 Fork Dialog
 
-> **Note:** `app.py` needs new imports for this section: `from pathlib import Path` and `from theact.versioning import git_save`.
+> **Note:** Step 00 provides `text_input_dialog()` in `components/dialogs.py` for text input dialogs. The fork name input should use this shared builder instead of building a custom dialog. The example below shows the inline approach for reference. Import `from pathlib import Path` and `from theact.versioning import git_save` as needed in `menu.py`.
 
 ```python
 def _show_fork_dialog(save_id: str, save_path: Path) -> None:
@@ -224,22 +206,16 @@ def _show_delete_dialog(save_id: str) -> None:
     dialog.open()
 ```
 
-### 2.7 Updated `_build_menu`
+### 2.7 Updated `MenuBuilder._build_saves_table()`
 
-Remove the standalone delete section. The menu becomes:
+Remove the standalone delete section. In `src/theact/web/menu.py`, `MenuBuilder._build_saves_table()` replaces the old saves + delete sections with the card-based layout above. The menu's `build()` method calls `_build_saves_table()` after the "New Game" section:
 
 ```python
-def _build_menu(container, enter_gameplay):
-    with container:
-        # Banner (unchanged)
-        ...
-        ui.separator()
-        # New Game section (unchanged)
-        _build_new_game_section(container, enter_gameplay)
-        ui.separator()
-        # Enhanced saves table (replaces old saves + delete sections)
-        saves_container = ui.column().classes("w-full")
-        _build_saves_table(saves_container, enter_gameplay)
+# In MenuBuilder.build(), after the new game section:
+ui.separator()
+# Enhanced saves table (replaces old saves + delete sections)
+saves_container = ui.column().classes("w-full")
+self._build_saves_table(saves_container)
 ```
 
 ---
@@ -765,8 +741,8 @@ class GameplaySession:
             ...
             # Build history browser (drawer, initially closed)
             self._history_browser = TurnHistoryBrowser(
-                save_path=self.game.save_path,
-                current_turn=self.game.state.turn,
+                save_path=self._state.game.save_path,
+                current_turn=self._state.game.state.turn,
                 on_restore=self._on_history_restore,
             )
             self._history_browser.build(container)
@@ -774,19 +750,19 @@ class GameplaySession:
     def open_history(self) -> None:
         """Open the turn history browser. Called from toolbar button."""
         if self._history_browser:
-            self._history_browser.current_turn = self.game.state.turn
+            self._history_browser.current_turn = self._state.game.state.turn
             self._history_browser.open()
 
     def _on_history_restore(self, steps: int) -> None:
         """Callback after history-based restore. Reloads game and re-renders."""
-        self._reload_game()
+        self._state.reload_game()
         self._chat_area.clear()
         self._render_history()
         self._update_header()
 
         # Update the history browser's current turn reference
         if self._history_browser:
-            self._history_browser.current_turn = self.game.state.turn
+            self._history_browser.current_turn = self._state.game.state.turn
 ```
 
 ### 7.2 Toolbar Integration
@@ -802,7 +778,7 @@ After each turn completes (`_play_turn` in `session.py`), update the history bro
         ...
         # After successful turn
         if self._history_browser:
-            self._history_browser.current_turn = self.game.state.turn
+            self._history_browser.current_turn = self._state.game.state.turn
 ```
 
 ---
