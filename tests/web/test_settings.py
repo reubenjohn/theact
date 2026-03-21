@@ -20,7 +20,11 @@ class TestSettingsPage:
     def test_settings_back_button(self, page, web_server):
         """Back button navigates to the menu."""
         page.goto(f"{web_server}/settings")
-        page.get_by_role("button", name="arrow_back").click()
+        page.wait_for_load_state("networkidle")
+        # NiceGUI renders icon buttons with a <i class="material-icons">
+        # element inside; match by filtering for the icon text content.
+        back_btn = page.locator("button").filter(has_text="arrow_back").first
+        back_btn.click()
         page.wait_for_url(f"{web_server}/")
         expect(page).to_have_url(f"{web_server}/")
 
@@ -36,13 +40,17 @@ class TestLLMConfigSection:
     def test_llm_config_fields_present(self, page, web_server):
         """LLM configuration section has all expected fields."""
         page.goto(f"{web_server}/settings")
+        page.wait_for_load_state("networkidle")
         expect(page.get_by_text("LLM Configuration")).to_be_visible()
-        expect(page.get_by_label("API Key")).to_be_visible()
-        expect(page.get_by_label("Base URL")).to_be_visible()
-        expect(page.get_by_label("Model", exact=True)).to_be_visible()
-        expect(page.get_by_text("Temperature")).to_be_visible()
-        expect(page.get_by_label("Default Max Tokens")).to_be_visible()
-        expect(page.get_by_label("Context Limit")).to_be_visible()
+        # NiceGUI/Quasar inputs render labels as floating text inside the
+        # input wrapper, not as HTML <label> elements. Use get_by_text()
+        # to match the label text rendered by Quasar.
+        expect(page.get_by_text("API Key", exact=True).first).to_be_visible()
+        expect(page.get_by_text("Base URL", exact=True).first).to_be_visible()
+        expect(page.get_by_text("Model", exact=True).first).to_be_visible()
+        expect(page.get_by_text("Temperature").first).to_be_visible()
+        expect(page.get_by_text("Default Max Tokens").first).to_be_visible()
+        expect(page.get_by_text("Context Limit").first).to_be_visible()
 
     def test_api_key_masked(self, page, web_server):
         """API key input is a password field (masked by default)."""

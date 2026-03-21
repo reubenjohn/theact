@@ -21,7 +21,10 @@ class TestDiagnosticsPage:
     def test_back_button_present(self, page, web_server):
         """Back button navigates to the menu."""
         page.goto(f"{web_server}/diagnostics")
-        back_btn = page.get_by_role("button", name="arrow_back")
+        page.wait_for_load_state("networkidle")
+        # NiceGUI renders icon buttons with a <i class="material-icons">
+        # element inside; match by filtering for the icon text content.
+        back_btn = page.locator("button").filter(has_text="arrow_back").first
         expect(back_btn).to_be_visible()
         back_btn.click()
         page.wait_for_url(f"{web_server}/")

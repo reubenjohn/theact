@@ -15,6 +15,18 @@ import urllib.request
 import pytest
 
 
+def _remove_lock_file(save_path) -> None:
+    """Remove any stale .lock file from a save directory.
+
+    The save lock is held per-tab and may not be released between
+    tests running in the same browser session, causing a lock conflict
+    dialog to block all UI interactions.
+    """
+    lock_file = save_path / ".lock"
+    if lock_file.exists():
+        lock_file.unlink(missing_ok=True)
+
+
 @pytest.fixture(scope="session")
 def web_server():
     """Launch the web UI server for the test session.

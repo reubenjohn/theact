@@ -14,6 +14,7 @@ import pytest
 from playwright.sync_api import expect
 
 from theact.io.save_manager import SAVES_DIR, create_save, load_save
+from tests.web.conftest import _remove_lock_file
 
 GAMES_DIR = Path(__file__).parent.parent.parent / "games"
 
@@ -46,6 +47,9 @@ def gameplay_page(page, web_server, ensure_test_save):
     Clicks the "Load" button next to the test save in the Continue
     section. No LLM call is triggered.
     """
+    # Remove any stale lock file before loading
+    _remove_lock_file(SAVES_DIR / _TEST_SAVE_ID)
+
     page.goto(web_server)
     page.wait_for_load_state("networkidle")
 
@@ -57,6 +61,12 @@ def gameplay_page(page, web_server, ensure_test_save):
     page.locator('input[placeholder="What do you do?"]').wait_for(
         state="visible", timeout=10000
     )
+
+    # Dismiss any save lock conflict dialog that may have appeared
+    dialog_btn = page.get_by_role("button", name="Force Unlock")
+    if dialog_btn.is_visible(timeout=1000):
+        dialog_btn.click()
+        page.wait_for_timeout(500)
 
     return page
 
