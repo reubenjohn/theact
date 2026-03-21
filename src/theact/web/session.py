@@ -22,6 +22,7 @@ from theact.web.command_router import CommandRouter
 from theact.web.components.message_blocks import create_player_block
 from theact.web.components.static_turn import render_static_turn
 from theact.web.components.turn_card import create_turn_card, create_turn_info_bar
+from theact.web.history import TurnHistoryBrowser
 from theact.web.sidebar import GameStateSidebar
 from theact.web.state import GameSessionState
 from theact.web.streaming import StreamRenderer
@@ -82,6 +83,7 @@ class GameplaySession:
         self._gameplay_container: ui.column | None = None
         self._toolbar: GameplayToolbar | None = None
         self._sidebar: GameStateSidebar | None = None
+        self._history_browser: TurnHistoryBrowser | None = None
         self._cmd_menu: ui.menu | None = None
 
     # --- Public properties for backward compat ---
@@ -149,6 +151,14 @@ class GameplaySession:
                 # --- Sidebar ---
                 self._sidebar = GameStateSidebar(state=self._state)
                 self._sidebar.build(self._gameplay_container)
+
+            # --- History browser (dialog, initially closed) ---
+            self._history_browser = TurnHistoryBrowser(
+                save_path=self._state.game.save_path,
+                current_turn=self._state.game.state.turn,
+                on_restore=self._on_history_restore,
+            )
+            self._history_browser.build(container)
 
         self._command_router = CommandRouter(self._state, self._chat_area)
         self._render_history()
@@ -329,6 +339,10 @@ class GameplaySession:
             self._state.reload_game()
             self._update_header()
 
+            # Keep history browser in sync with current turn
+            if self._history_browser:
+                self._history_browser.current_turn = self._state.game.state.turn
+
         except Exception as e:
             logger.exception("Error during turn")
             renderer.finish()
@@ -458,14 +472,21 @@ class GameplaySession:
             ui.notify(result.message, type="warning")
 
     def _toolbar_history(self) -> None:
-        """Toolbar history callback: show history in chat area."""
-        from theact.commands.logic import cmd_history
-        from theact.web.components.html_utils import render_result
+        """Toolbar history callback: toggle the history browser panel."""
+        if self._history_browser:
+            self._history_browser.current_turn = self._state.game.state.turn
+            self._history_browser.toggle()
 
-        result = cmd_history(self._state.game)
-        render_result(self._chat_area, result)
-        if self._chat_scroll:
-            self._chat_scroll.scroll_to(percent=1.0)
+    def _on_history_restore(self, steps: int) -> None:
+        """Callback after history-based restore. Reloads game and re-renders."""
+        self._state.reload_game()
+        self._chat_area.clear()
+        self._render_history()
+        self._update_header()
+
+        # Update the history browser's current turn reference
+        if self._history_browser:
+            self._history_browser.current_turn = self._state.game.state.turn
 
     # --- Input helpers ---
 

@@ -32,9 +32,9 @@ def gameplay_page(page, web_server, ensure_test_save):
     """Navigate to the gameplay view by loading the test save."""
     page.goto(web_server)
     page.wait_for_load_state("networkidle")
-    save_row = page.locator(f"text={_TEST_SAVE_ID}").first
-    load_btn = save_row.locator("..").get_by_role("button", name="Load")
-    load_btn.click()
+    # Find the save card and click its first button (Load)
+    save_card = page.locator(f'[data-testid="save-card-{_TEST_SAVE_ID}"]')
+    save_card.locator("button").first.click()
     page.locator('input[placeholder="What do you do?"]').wait_for(
         state="visible", timeout=10000
     )
@@ -74,13 +74,11 @@ class TestToolbarButtons:
 class TestToolbarHistory:
     """Test the history button functionality."""
 
-    def test_history_button_shows_output(self, gameplay_page):
-        """Clicking history should render history content in chat area."""
+    def test_history_button_opens_browser(self, gameplay_page):
+        """Clicking history should open the history browser panel."""
         page = gameplay_page
         page.locator('[data-testid="toolbar-history"]').click()
-        # Should show either history content or "No turn history yet."
-        # (depends on whether the test save has any turns)
         page.wait_for_timeout(500)
-        # Verify no error occurred (no red error labels)
-        error_locator = page.locator('text="Error"')
-        expect(error_locator).not_to_be_visible()
+        # The history browser dialog should be visible with its title
+        expect(page.get_by_text("Turn History")).to_be_visible()
+        expect(page.locator('[data-testid="history-browser"]')).to_be_visible()

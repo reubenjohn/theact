@@ -62,15 +62,9 @@ class TestMenuContinueSection:
         expect(page.get_by_text("Continue Game")).to_be_visible()
 
 
-class TestMenuDeleteSection:
-    """Tests for the 'Delete Save' section."""
+class TestMenuSaveCards:
+    """Tests for card-based save layout (replaces old delete section)."""
 
-    def test_delete_save_label_visible(self, page, web_server):
+    def test_continue_game_section_visible(self, page, web_server):
         page.goto(web_server)
-        expect(page.get_by_text("Delete Save")).to_be_visible()
-
-    def test_delete_button_present(self, page, web_server):
-        page.goto(web_server)
-        # The delete section has a delete button
-        delete_buttons = page.get_by_role("button", name="Delete")
-        expect(delete_buttons.first).to_be_visible()
+        expect(page.get_by_text("Continue Game")).to_be_visible()

@@ -49,10 +49,9 @@ def gameplay_page(page, web_server, ensure_test_save):
     page.goto(web_server)
     page.wait_for_load_state("networkidle")
 
-    # Find and click the Load button for our test save
-    save_row = page.locator(f"text={_TEST_SAVE_ID}").first
-    load_btn = save_row.locator("..").get_by_role("button", name="Load")
-    load_btn.click()
+    # Find the save card and click its first button (Load)
+    save_card = page.locator(f'[data-testid="save-card-{_TEST_SAVE_ID}"]')
+    save_card.locator("button").first.click()
 
     # Wait for gameplay view to appear
     page.locator('input[placeholder="What do you do?"]').wait_for(
