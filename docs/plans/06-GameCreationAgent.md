@@ -363,12 +363,21 @@ STYLE GUIDE FOR CHARACTERS:
 - Personality should define speech patterns and behavior, not backstory.
 - Secrets are hidden motivations or knowledge -- one punchy sentence.
 - Relationships are one character's stance toward another -- terse and opinionated.
+- Relationship KEYS must be the OTHER character's file stem (e.g., "maya",
+  not "Maya Chen"). Each character must have a relationship entry for every
+  other character, and must NOT have an entry for themselves.
 
 STYLE GUIDE FOR CHAPTERS:
 - Beats are milestones the narrator steers toward, not a script.
 - The completion condition is a clear, testable state ("Player and Maya have
   reached the cave entrance" not "the chapter feels complete").
 - The last chapter's `next` field must be null.
+
+STRUCTURAL LIMITS:
+- Maximum 3 characters. The runtime model cannot maintain distinct voices
+  for more than 3 AI characters.
+- 3-5 chapters. Each chapter should cover 5-10 turns of gameplay.
+- The last chapter's `next` field must be null. All others must chain forward.
 
 STYLE GUIDE FOR WORLD:
 - Setting is WHERE and WHEN. Concrete. Sensory.
@@ -749,7 +758,9 @@ def _check_cross_references(
                     f"Relationship key '{rel_name}' does not match any character stem"
                 ))
 
-    # Chapter order: next-chain should match game.yaml chapter order
+    # Chapter order: next-chain should match game.yaml chapter order.
+    # This also implicitly prevents circular chains — the game.yaml list
+    # defines a linear order, and the last chapter must have next=None.
     chapter_list = game.chapters
     for i, cid in enumerate(chapter_list):
         if cid not in chapters:
@@ -761,6 +772,22 @@ def _check_cross_references(
                 f"chapters/{cid}.yaml", "next",
                 f"Expected next='{expected_next}' but got next='{actual_next}'"
             ))
+
+    # Explicit circular chain detection: follow next pointers and verify
+    # we reach None within len(chapters) steps. This catches cycles even
+    # if the game.yaml order check is bypassed or incomplete.
+    if chapter_list and chapter_list[0] in chapters:
+        visited = set()
+        current = chapter_list[0]
+        while current is not None:
+            if current in visited:
+                errors.append(ValidationError(
+                    f"chapters/{current}.yaml", "next",
+                    f"Circular chapter chain detected: '{current}' is reached twice"
+                ))
+                break
+            visited.add(current)
+            current = chapters[current].next if current in chapters else None
 
     return errors
 ```
@@ -826,8 +853,28 @@ The fix loop in `fixer.py`:
 ```python
 # src/theact/creator/fixer.py
 
+import yaml
+from openai import AsyncOpenAI
+
 from theact.creator.validator import validate_game_data, ValidationResult
+from theact.creator.generator import _parse_generation_response, YAMLParseError
 from theact.creator.prompts import FIX_SYSTEM, FIX_USER
+
+
+def _serialize_game_data(data: dict) -> str:
+    """Serialize a game data dict to a YAML string for prompt injection."""
+    return yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+
+async def _call_llm(client: AsyncOpenAI, config, messages: list[dict]) -> str:
+    """Call the LLM and return the response text content."""
+    response = await client.chat.completions.create(
+        model=config.model,
+        messages=messages,
+        temperature=config.temperature,
+        max_tokens=config.max_tokens,
+    )
+    return response.choices[0].message.content
 
 MAX_FIX_ATTEMPTS = 3
 
@@ -843,6 +890,10 @@ async def fix_validation_errors(
 
     Returns the (possibly fixed) data and final validation result.
     Tries up to MAX_FIX_ATTEMPTS times.
+
+    Handles two failure modes per attempt:
+    1. LLM produces invalid YAML (YAMLParseError) — counts as a failed attempt
+    2. LLM produces valid YAML that fails Pydantic validation — feeds errors back
     """
     current_data = data
     current_result = validation_result
@@ -867,7 +918,12 @@ async def fix_validation_errors(
         ]
 
         response = await _call_llm(client, config, messages)
-        current_data = _parse_generation_response(response)
+        try:
+            current_data = _parse_generation_response(response)
+        except YAMLParseError:
+            # LLM produced unparseable output — keep previous data and
+            # let the loop retry with the same errors
+            continue
         current_result = validate_game_data(current_data)
 
     return current_data, current_result
@@ -916,15 +972,25 @@ if __name__ == "__main__":
     main()
 ```
 
-### 6.3 Menu Integration (`cli/menu.py` changes)
+### 6.3 Menu Integration (changes to Phase 04 files)
 
-The existing `menu.py` gains one new function call. When the user selects "Create Game", it calls:
+Two Phase 04 files must be updated:
+
+**`cli/app.py`** — Add `"create"` as a recognized choice in `_main_menu()` and add a handler case in the `run()` method. The existing Phase 04 menu has 4 options (New Game, Continue Game, Delete Save, Quit); this becomes 5 options with "Create Game" inserted at position 3.
+
+**`cli/menu.py`** — Add a `display_main_menu()` update to include the new option, or update the existing menu rendering to include "Create Game".
+
+When the user selects "Create Game", the handler calls:
 
 ```python
 from theact.creator.session import create_game
 
-# Inside the menu handler:
-await create_game()
+# Inside the app.py run loop:
+elif choice == "create":
+    await create_game()
+    # After creation completes (or aborts), loop back to menu.
+    # The new game will automatically appear in "New Game" list
+    # because list_games() scans the games/ directory.
 ```
 
 After creation completes, the menu refreshes and the new game appears in the "New Game" list.
@@ -944,7 +1010,7 @@ from rich.console import Console
 
 from theact.creator.config import CreatorLLMConfig, load_creator_config
 from theact.creator.proposer import generate_proposal, revise_proposal
-from theact.creator.generator import generate_game_files
+from theact.creator.generator import generate_game_files, YAMLParseError
 from theact.creator.validator import validate_game_data, check_size_warnings
 from theact.creator.fixer import fix_validation_errors
 from theact.creator.writer import write_game_files
@@ -994,7 +1060,12 @@ async def create_game() -> Path | None:
 
     # Step 3: Generate full game files
     console.print("\n[dim]Generating game files...[/dim]\n")
-    data = await generate_game_files(proposal, client, config)
+    try:
+        data = await generate_game_files(proposal, client, config)
+    except YAMLParseError as e:
+        console.print(f"[red]Failed to generate valid YAML after retries:[/red]\n{e}")
+        console.print("[dim]Please try again with a different concept.[/dim]")
+        return None
 
     # Step 4: Validate
     result = validate_game_data(data)
@@ -1041,9 +1112,59 @@ async def create_game() -> Path | None:
 
     # Step 7: Write to disk
     game_id = result.game.id
-    game_path = write_game_files(game_id, result)
+    overwrite = False
+    game_dir = Path("games") / game_id
+    if game_dir.exists():
+        confirm = _get_input(
+            f"Game directory '{game_dir}' already exists. Overwrite? (y/n): "
+        )
+        if not confirm or confirm.lower() not in ("y", "yes"):
+            console.print("[dim]Aborted — existing game not overwritten.[/dim]")
+            return None
+        overwrite = True
+
+    game_path = write_game_files(game_id, result, overwrite=overwrite)
     console.print(f"\n[green]Game created at:[/green] {game_path}\n")
     return game_path
+
+
+async def _revise_and_validate(
+    data: dict,
+    feedback: str,
+    client,         # AsyncOpenAI
+    config,         # CreatorLLMConfig
+) -> dict:
+    """
+    Revise specific files based on user feedback and return updated data.
+
+    Sends the current game data and user feedback to the LLM using
+    TARGETED_REVISION_USER, then parses the response. If YAML parsing
+    fails, retries up to 2 times. Returns the (possibly revised) data dict.
+    """
+    from theact.creator.prompts import GENERATION_SYSTEM, TARGETED_REVISION_USER
+    from theact.creator.generator import _parse_generation_response, YAMLParseError
+
+    yaml_text = _serialize_game_data(data)
+    messages = [
+        {"role": "system", "content": GENERATION_SYSTEM},
+        {"role": "user", "content": TARGETED_REVISION_USER.format(
+            user_feedback=feedback,
+            current_output=yaml_text,
+        )},
+    ]
+
+    for attempt in range(3):
+        response = await _call_llm(client, config, messages)
+        try:
+            return _parse_generation_response(response)
+        except YAMLParseError as e:
+            if attempt == 2:
+                console.print(f"[red]Failed to parse revised output: {e}[/red]")
+                return data  # Return unmodified data on total failure
+            messages.append({"role": "assistant", "content": response})
+            messages.append({"role": "user", "content": f"That output was not valid YAML: {e}\nPlease try again."})
+
+    return data
 
 
 def _get_input(prompt: str = "> ") -> str | None:
@@ -1053,6 +1174,37 @@ def _get_input(prompt: str = "> ") -> str | None:
     except (EOFError, KeyboardInterrupt):
         console.print("\n[dim]Aborted.[/dim]")
         return None
+
+
+# NOTE: _create_client, _call_llm, and _serialize_game_data are shared
+# helpers also used by fixer.py and _revise_and_validate. During
+# implementation, move them to a shared module (e.g., creator/utils.py)
+# rather than duplicating.
+
+def _create_client(config: CreatorLLMConfig):
+    """Create an AsyncOpenAI client from the creator config."""
+    from openai import AsyncOpenAI
+    return AsyncOpenAI(
+        base_url=config.base_url,
+        api_key=config.api_key,
+    )
+
+
+async def _call_llm(client, config: CreatorLLMConfig, messages: list[dict]) -> str:
+    """Call the LLM and return the response text content."""
+    response = await client.chat.completions.create(
+        model=config.model,
+        messages=messages,
+        temperature=config.temperature,
+        max_tokens=config.max_tokens,
+    )
+    return response.choices[0].message.content
+
+
+def _serialize_game_data(data: dict) -> str:
+    """Serialize a game data dict to a YAML string for prompt injection."""
+    import yaml
+    return yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
 ```
 
 ---
@@ -1140,10 +1292,12 @@ def load_creator_config() -> CreatorLLMConfig:
 The `.env.example` file should be updated with:
 
 ```
-# Game Creation Agent (optional -- uses a more capable model)
-# CREATOR_API_KEY=sk-...
+# Game Creation Agent (RECOMMENDED — uses a more capable model than gameplay)
+# Without these, the creator falls back to VENICE_* settings and the 7B model,
+# which cannot reliably generate game files. Set at least CREATOR_MODEL.
+# CREATOR_API_KEY=sk-...           # Required if using a different provider
 # CREATOR_BASE_URL=https://api.openai.com/v1
-# CREATOR_MODEL=gpt-4o
+# CREATOR_MODEL=gpt-4o             # Or: claude-sonnet-4-20250514, etc.
 ```
 
 ---
@@ -1230,7 +1384,9 @@ Build in this order. Each step should produce working, tested code before moving
 - Write `tests/test_creator_config.py`:
   - Test that `load_creator_config()` reads `CREATOR_*` env vars
   - Test fallback to `VENICE_*` env vars
-  - Test defaults when no env vars are set
+  - Test that a warning is issued when the resolved model is the 7B gameplay model
+  - Test that `ValueError` is raised when no API key is found (no `CREATOR_API_KEY` or `VENICE_API_KEY`)
+  - Test `is_small_model` property returns True for the 7B model and False for other models
 
 ### Step 3: Prompt templates
 
@@ -1248,6 +1404,9 @@ Build in this order. Each step should produce working, tested code before moving
   - Test validation passes for correctly structured data (use Lost Island as reference)
   - Test each Pydantic validation error is caught and reported (missing fields, wrong types, extra fields)
   - Test cross-reference errors: missing character file, broken chapter chain, invalid relationship key
+  - Test character count limits: 0 characters produces error, 4+ characters produces error, 1-3 characters passes
+  - Test self-referencing relationship: character with a relationship key pointing to itself
+  - Test circular chapter chain: chapter A -> B -> A detected as error
   - Test size warnings: oversized character, too many beats, verbose world file
   - Test that a fully valid game produces `ValidationResult(valid=True)`
 
@@ -1271,11 +1430,17 @@ Build in this order. Each step should produce working, tested code before moving
 
 ### Step 7: Generator
 
-- Implement `generator.py` with `generate_game_files()`
+- Implement `generator.py` with `generate_game_files()` and `_parse_generation_response()`
 - Takes a proposal dict, calls the LLM, parses the full YAML output into a data dict
+- Implements YAML parse retry: up to 2 retries on `YAMLParseError`, with the error message fed back to the LLM
 - Write `tests/test_creator_generator.py`:
   - Test with a mock LLM client returning a canned full-generation YAML response
   - Test that the output dict has the correct structure (`game`, `world`, `characters`, `chapters` keys)
+  - Test `_parse_generation_response` with YAML inside fenced code blocks
+  - Test `_parse_generation_response` with raw YAML (no fencing)
+  - Test `_parse_generation_response` raises `YAMLParseError` on malformed YAML
+  - Test `_parse_generation_response` raises `YAMLParseError` when required top-level keys are missing
+  - Test retry behavior: mock LLM returns bad YAML once, then good YAML
 
 ### Step 8: Fixer
 
@@ -1324,7 +1489,12 @@ Phase 06 is complete when all of the following pass:
 1. **Unit tests pass:** `uv run pytest tests/test_creator_*.py` -- all green
 2. **Standalone execution:** `uv run python -m theact.creator` launches the interactive creation flow
 3. **CLI integration:** The main menu shows "Create Game" and the option works
-4. **Validation thoroughness:** Intentionally malformed LLM output is caught and either fixed or reported
+4. **Validation thoroughness:** Intentionally malformed LLM output is caught and either fixed or reported. This includes:
+   - Invalid YAML (parse errors) — caught by `YAMLParseError`, retried
+   - Valid YAML with wrong structure — caught by Pydantic `extra="forbid"`, fed to fix loop
+   - Cross-reference errors (broken chapter chain, invalid relationship keys) — caught by `_check_cross_references`
+   - Character count > 3 — caught by validator
+   - Circular chapter chain — caught by explicit cycle detection
 5. **Size compliance:** Generated games pass size checks:
    - `world.yaml` under 150 words
    - Each character YAML under 80 words
@@ -1345,7 +1515,7 @@ Phase 06 is complete when all of the following pass:
 
 **Step 2 — Test the iteration loop:**
 - During creation, provide critical feedback: "Change the first character to be more antagonistic" or "Add a fourth chapter." Verify the agent modifies the proposal and regenerated files correctly.
-- Try vague concepts: "A game about friendship." Verify the agent asks clarifying questions rather than guessing.
+- Try vague concepts: "A game about friendship." The agent will attempt to generate a proposal from minimal input. Verify the proposal is reasonable. If the proposal is too generic, the user can revise it in the iteration loop (Step 5). The agent does NOT ask clarifying questions — it always generates a proposal, and the user iterates.
 
 **Step 3 — Fix and capture:**
 - For validation failures the fix loop misses, add the pattern to `validator.py`'s checks.

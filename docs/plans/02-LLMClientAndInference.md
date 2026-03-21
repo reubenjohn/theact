@@ -129,6 +129,12 @@ GAME_STATE_CONFIG = AgentLLMConfig(
     structured=True,
     max_retries=2,
 )
+
+SUMMARIZER_CONFIG = AgentLLMConfig(
+    temperature=0.3,
+    max_tokens=300,
+    structured=False,
+)
 ```
 
 ### 3.2 Client (`client.py`)
@@ -142,6 +148,8 @@ _client: AsyncOpenAI | None = None
 
 def get_client(config: LLMConfig) -> AsyncOpenAI:
     """Return a singleton AsyncOpenAI client configured for Venice AI."""
+    # NOTE: Once created, the singleton ignores subsequent configs.
+    # Call reset_client() first if the config has changed.
     global _client
     if _client is None:
         _client = AsyncOpenAI(
@@ -231,6 +239,12 @@ async def complete(
     """
     Non-streaming completion. Returns the full response at once.
     Used for post-turn processing where streaming isn't needed.
+
+    Note: This function must also extract thinking tokens from non-streaming
+    responses. It should check `message.model_extra` for a `reasoning_content`
+    field and also parse `<think>...</think>` tags from `message.content`,
+    removing them from the `content` field and placing them in the `thinking`
+    field of the returned LLMResult.
     """
     ...
 
@@ -277,6 +291,10 @@ async def stream_structured(
 
     The caller can iterate the stream for live display, and then await
     the future to get the parsed data.
+
+    IMPORTANT: The caller MUST fully consume the stream iterator before
+    awaiting the future. If the stream is not fully consumed (e.g., the
+    caller breaks early), the future will never resolve.
     """
     ...
 ```
@@ -347,9 +365,9 @@ Based on what happened, output a YAML block:
 
 ```yaml
 chapter_complete: false
-reason: "Brief explanation of why the chapter is or is not complete"
-important_event: false
-event_description: ""
+reason: "One sentence explaining progress or why not complete"
+new_beats:
+  - "Exact beat text that was hit this turn"
 ```
 ```
 
@@ -376,17 +394,22 @@ def extract_yaml_block(text: str) -> str:
     Falls back to ``` ... ``` (unfenced but code-blocked).
     Falls back to treating the entire response as YAML if no blocks found.
     """
-    # Try ```yaml ... ``` first
-    match = re.search(r"```yaml\s*\n(.*?)```", text, re.DOTALL)
-    if match:
-        return match.group(1).strip()
+    # Try ```yaml ... ``` first.
+    # Use findall and take the LAST match -- the model may include example
+    # YAML blocks earlier in its response before the actual answer.
+    matches = re.findall(r"```yaml\s*\n(.*?)```", text, re.DOTALL)
+    if matches:
+        return matches[-1].strip()
 
     # Try generic ``` ... ```
-    match = re.search(r"```\s*\n(.*?)```", text, re.DOTALL)
-    if match:
-        return match.group(1).strip()
+    matches = re.findall(r"```\s*\n(.*?)```", text, re.DOTALL)
+    if matches:
+        return matches[-1].strip()
 
-    # No code block found -- try the whole text as YAML
+    # No code block found -- try the whole text as YAML.
+    # WARNING: This fallback can produce false positives (e.g., plain English
+    # text parsed as a YAML string). The implementation should log a warning
+    # when this path is taken.
     return text.strip()
 
 
@@ -465,10 +488,15 @@ async def complete_structured(messages, llm_config, agent_config, yaml_hint=""):
             )
         except YAMLParseError as e:
             last_error = str(e)
-            # Append correction message for retry
+            # Append correction message for retry.
+            # NOTE on context growth: each retry adds ~2 messages (assistant
+            # response + user correction). With max_retries=2, this adds up
+            # to 4 extra messages. For small models with tight context
+            # windows, consider truncating the failed response to the first
+            # 200 chars to limit context growth.
             working_messages.append({
                 "role": "assistant",
-                "content": result.content,
+                "content": result.content[:200] + ("..." if len(result.content) > 200 else ""),
             })
             correction = f"Your response could not be parsed. Error: {last_error}"
             if yaml_hint:
@@ -501,6 +529,13 @@ Our streaming layer will detect and handle both approaches.
 
 ### 5.2 Stream Processing
 
+Note on think tag handling: Streaming chunks can split `<think>` or `</think>`
+tags across boundaries. The implementation should buffer the last few characters
+when they could be the start of a tag (`<`, `<t`, `<th`, etc.) and flush them
+on the next chunk. For v1, a simpler approach: if a chunk ends with `<` or
+starts with partial tag text, buffer it. The implementation may need to handle
+this pragmatically based on observed Venice AI behavior.
+
 ```python
 from typing import AsyncIterator
 from openai import AsyncOpenAI
@@ -517,7 +552,10 @@ async def _process_stream(
     Yields StreamChunk objects.
     """
     in_think_tag = False
-    thinking_buffer = ""
+    # Buffer for partial tag detection. If a chunk ends with characters that
+    # could be the start of a <think> or </think> tag, we hold them here and
+    # prepend them to the next chunk before processing.
+    tag_buffer = ""
 
     async for chunk in response:
         if not chunk.choices:
@@ -540,14 +578,37 @@ async def _process_stream(
 
         content = delta.content or ""
 
-        # Strategy 2: Detect <think>...</think> tags in content
+        # Prepend any buffered partial-tag characters from the previous chunk
+        if tag_buffer:
+            content = tag_buffer + content
+            tag_buffer = ""
+
+        # Buffer trailing characters that could be the start of a tag.
+        # Partial prefixes of "<think>" or "</think>" should be held back.
+        _TAG_PREFIXES = ("<", "<t", "<th", "<thi", "<thin", "<think",
+                         "</", "</t", "</th", "</thi", "</thin", "</think")
+        for i in range(min(len(content), 8), 0, -1):
+            if content[-i:] in _TAG_PREFIXES:
+                tag_buffer = content[-i:]
+                content = content[:-i]
+                break
+
+        # Strategy 2: Detect <think>...</think> tags in content.
+        # Handle case where a single chunk contains both <think> and </think>.
         if "<think>" in content:
             in_think_tag = True
-            # Split: anything before <think> is content, after is thinking
             before, _, after = content.partition("<think>")
             if before:
                 yield StreamChunk(content=before)
-            if after:
+            # Check if </think> also appears in the remainder (same chunk)
+            if "</think>" in after:
+                in_think_tag = False
+                think_text, _, post_think = after.partition("</think>")
+                if think_text:
+                    yield StreamChunk(thinking=think_text)
+                if post_think:
+                    yield StreamChunk(content=post_think)
+            elif after:
                 yield StreamChunk(thinking=after)
             continue
 
@@ -566,6 +627,13 @@ async def _process_stream(
             yield StreamChunk(content=content)
 
         if finish_reason:
+            # Flush any remaining buffer as-is
+            if tag_buffer:
+                if in_think_tag:
+                    yield StreamChunk(thinking=tag_buffer)
+                else:
+                    yield StreamChunk(content=tag_buffer)
+                tag_buffer = ""
             yield StreamChunk(finish_reason=finish_reason)
 
 

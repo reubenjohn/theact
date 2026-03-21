@@ -118,7 +118,7 @@ NiceGUI is the clear winner for this project. The reasoning:
 
 5. **Multi-view navigation** is natural. We can use `ui.page` decorators for different routes (menu, game session) or swap content within a single page using container visibility.
 
-6. **Minimal frontend code.** Everything is Python. No React, no Vue templates, no build step. The occasional `ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')` is the extent of JS involvement.
+6. **Minimal frontend code.** Everything is Python. No React, no Vue templates, no build step. Auto-scroll uses NiceGUI's built-in `scroll_area.scroll_to()` -- JavaScript is rarely needed.
 
 The tradeoff -- smaller community and less name recognition -- is acceptable for a local-only tool where we control the entire stack.
 
@@ -311,11 +311,13 @@ Implementation notes:
 ```
 
 Implementation notes:
-- The chat area is a scrollable `ui.column` (or `ui.scroll_area`) containing turn cards.
+- The chat area is a `ui.scroll_area` containing turn cards.
 - Each turn is a `ui.card` containing message blocks.
 - Each message block has a colored name label and body text.
 - Thinking sections use `ui.expansion` (collapsed by default) within the turn card.
 - During streaming, text is appended to the active message element. NiceGUI pushes updates via WebSocket.
+
+> **Why not `ui.chat_message`?** The evaluation (Section 2.1) highlights NiceGUI's built-in `ui.chat_message` component. However, our design groups messages by **turn** (a card containing narrator + characters + player for one turn), while `ui.chat_message` renders individual messages in a flat chat-bubble layout. Using `ui.chat_message` would lose the turn-grouped structure and make thinking panels (which span the whole turn, not a single message) awkward to place. The custom `ui.card` + `ui.label` + `ui.html` approach gives us the turn-card layout from the wireframe above. If the turn-card grouping proves unnecessary during implementation, switching to `ui.chat_message` is straightforward -- it accepts `name`, `text`, and `stamp` parameters and supports `avatar` for per-character icons.
 - The input area is fixed at the bottom using CSS positioning.
 - The Send button and text input are disabled during turn processing and re-enabled on `TurnComplete`.
 - The header bar shows game title, current turn, chapter title, and navigation buttons.
@@ -430,8 +432,9 @@ async def handle_turn(player_input: str):
 
                 case TurnComplete(turn=turn_num):
                     update_header(turn_num)
-                    # Reload game state
+                    # Reload game state and update session storage
                     game = save_manager.load_save(game.save_path)
+                    app.storage.tab['game'] = game
 
     except Exception as e:
         show_error_message(turn_card, str(e))
@@ -462,7 +465,7 @@ class StreamingTextBlock:
         # Update the HTML content with the accumulated text
         # Convert newlines to <br>, escape HTML entities
         full_text = ''.join(self._buffer)
-        self._element.content = _text_to_html(full_text)
+        self._element.content = self._text_to_html(full_text)
 
     @staticmethod
     def _text_to_html(text: str) -> str:
@@ -646,12 +649,19 @@ gameplay_container = ui.column().set_visibility(False)
 def enter_gameplay(game: LoadedGame):
     menu_container.set_visibility(False)
     gameplay_container.set_visibility(True)
+    # Store in tab storage for refresh recovery (see Section 4.6)
+    engine = TurnEngine(game, llm_config)
+    app.storage.tab['game'] = game
+    app.storage.tab['engine'] = engine
     # Initialize session state and render conversation history
-    init_session(game)
+    init_session(game, engine)
 
 def return_to_menu():
     gameplay_container.set_visibility(False)
     menu_container.set_visibility(True)
+    # Clear session state so refresh goes to menu
+    app.storage.tab['game'] = None
+    app.storage.tab['engine'] = None
     refresh_save_list()
 ```
 
@@ -707,7 +717,8 @@ Command output is displayed as "system message" cards in the chat area -- visual
 def show_system_message(content: str):
     """Add a system information card to the chat area."""
     with chat_area:
-        with ui.card().classes('w-full bg-gray-800 text-gray-400 text-sm'):
+        # Use opacity and border instead of bg-gray-800 to work with Quasar dark mode
+        with ui.card().classes('w-full text-gray-400 text-sm opacity-80 border border-gray-700'):
             ui.html(content)
     auto_scroll()
 ```
@@ -731,6 +742,7 @@ async def cmd_undo_web(args: list[str]):
     try:
         new_turn = git_save.undo(Path(game.save_path), steps)
         game = save_manager.load_save(game.save_path)
+        app.storage.tab['game'] = game  # Update session state
         # Clear chat area and re-render from conversation history
         chat_area.clear()
         render_conversation_history(game.conversation, game)
@@ -751,7 +763,7 @@ Build in this order. Each step produces a working, testable increment.
 
 - Create `src/theact/web/__init__.py` with a `start_web()` function stub
 - Create `web.py` entry point that calls `start_web()`
-- Add `nicegui` to `pyproject.toml` dependencies
+- Add `nicegui` to `pyproject.toml` under `[project.optional-dependencies]` as `web = ["nicegui>=2.0.0"]`
 - Create `src/theact/web/styles.py` with color constants mirroring the CLI's color scheme
 - Verify `uv sync` installs NiceGUI and `uv run python web.py` launches a browser with a blank page
 
@@ -838,13 +850,14 @@ Build in this order. Each step produces a working, testable increment.
 - Handle LLM errors during streaming: show error message in the turn card, unlock input
 - Handle empty player input: ignore submission, refocus input field
 - Handle very long conversations: verify the scroll area handles 50+ turn cards without performance degradation
-- Handle server restart: if the NiceGUI server is restarted, the browser reconnects and shows the menu (state is not persisted in the browser)
-- Handle concurrent sessions: verify that two browser tabs each have independent session state (NiceGUI handles this via per-client storage)
+- Handle server restart: if the NiceGUI server is restarted, all `app.storage.tab` data (game sessions, engine instances) is lost. NiceGUI will attempt to reconnect the browser's WebSocket, but the server-side state is gone. The page will rebuild and show the menu. `app.storage.user` preferences survive restart because they are persisted to disk.
+- Handle concurrent sessions: verify that two browser tabs each have independent session state (NiceGUI handles this via `app.storage.tab`). See the multi-tab conflict warning in Section 3.4 -- two tabs loading the same save need a file-lock or warning.
 - Handle opening narration: if turn == 0 on game load, automatically trigger the first turn with `"[game start]"` as player input
 
 ### Step 8: Polish and styling
 
-- Apply consistent dark theme using NiceGUI's `ui.dark_mode(True)` and Tailwind classes
+- Dark theme is already enabled via `dark=True` in `ui.run()`. No need to also call `ui.dark_mode(True)` -- they do the same thing. Apply Tailwind classes for fine-tuning colors within the dark theme.
+  - **Note:** In dark mode, NiceGUI's Quasar components use a dark card/surface color automatically. Custom `bg-gray-800` Tailwind classes on `ui.card` elements may conflict with Quasar's dark theme colors. Test that card backgrounds look correct and adjust to use Quasar's `q-dark` class or remove conflicting Tailwind backgrounds.
 - Style the header bar, cards, message blocks, and input area
 - Set character colors to match the CLI's `CHARACTER_COLORS` palette
 - Add the game title banner to the menu view

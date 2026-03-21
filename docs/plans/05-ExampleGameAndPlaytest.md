@@ -39,21 +39,20 @@ chapters:
 
 ```yaml
 setting: >
-  An uncharted volcanic island in the South Pacific, 2024. Survivors of
-  Flight NZ-417 crashed into the northern reef. Dense jungle interior,
-  a central volcanic ridge, and ancient stone ruins half-swallowed by
-  vegetation. No radio, no GPS, no rescue coming.
+  Uncharted volcanic island, South Pacific, 2024. Survivors of Flight
+  NZ-417 crashed into the northern reef. No GPS, no radio, no rescue coming.
 
 tone: >
-  Second person, present tense. Sensory-first narration -- sounds, smells,
-  textures before explanations. Slow-burn tension through small wrong
-  details. Keep responses between 100 and 250 words.
+  Second person, present tense. Sensory-first narration. Slow-burn tension
+  through small wrong details. 100-250 words per turn.
 
 rules: >
-  The supernatural is always ambiguous -- every anomaly could have a
-  mundane explanation. Characters remember what happened. Never break
-  the second-person frame. Never narrate the player's thoughts or decisions.
+  The supernatural is always ambiguous -- every anomaly has a mundane
+  explanation. Never break the second-person frame. Never narrate the
+  player's thoughts or decisions.
 ```
+
+> **Word count check:** This world.yaml is 6 sentences (~60 words), matching the ~6 sentence target from CLAUDE.md. The Phase 05 draft had 9 sentences -- trimmed to stay within small-model budget.
 
 ### 2.3 characters/maya.yaml
 
@@ -323,9 +322,9 @@ class PlaytestRunner:
         if self.logger.is_repeating(result.narrator_text, window=3):
             self.logger.log_issue(turn, "narrator_repeating")
 
-        # Memory corruption -- key_facts exceeding limit
+        # Memory corruption -- key_facts exceeding limit (max 10 per CLAUDE.md)
         for name, memory in result.updated_memories.items():
-            if len(memory.key_facts) > 12:
+            if len(memory.key_facts) > 10:
                 self.logger.log_issue(turn, f"memory_overflow:{name}")
 ```
 
@@ -366,6 +365,8 @@ Guidelines:
 - Be curious about strange details
 - Sometimes push back on character suggestions
 - Keep responses to 1-2 sentences
+- IMPORTANT: Do NOT repeat actions you have already taken. If you already
+  looked around, try something new. Vary your approach each turn.
 ```
 
 ### 4.2 Edge Case Injection
@@ -557,6 +558,7 @@ class TurnLog:
     narrator_thinking: str
     character_texts: dict[str, str]       # character_name -> text
     character_thinking: dict[str, str]    # character_name -> thinking
+    characters_responded: list[str]       # ordered list of characters who spoke
     memory_updates: dict[str, str]        # character_name -> new summary
     memory_thinking: dict[str, str]       # character_name -> thinking
     game_state_thinking: str              # game state agent thinking
@@ -564,6 +566,10 @@ class TurnLog:
     elapsed_seconds: float
     issues: list[str]
     is_edge_case: bool
+    # Token usage per turn (summed across all agent calls in this turn)
+    prompt_tokens: int = 0
+    thinking_tokens: int = 0
+    response_tokens: int = 0
 
 class PlaytestLogger:
     """Accumulates all playtest data for report generation."""
@@ -596,17 +602,42 @@ class PlaytestLogger:
     def is_repeating(self, text: str, window: int = 3) -> bool:
         """Check if the narrator output is too similar to recent turns.
 
-        Uses a simple approach: if the first 50 characters of the
-        narrator text match any of the last `window` narrator texts,
-        flag it as repeating.
+        Uses word-set overlap: computes the set of words in the new text
+        and each recent narrator text, then flags as repeating if the
+        Jaccard similarity exceeds 0.6 (60% word overlap). This is more
+        robust than prefix matching, which gives false positives when
+        many narrator responses start with 'You' or 'The'.
         """
-        recent = [t.narrator_text[:50] for t in self.turns[-window:]]
-        return text[:50] in recent
+        new_words = set(text.lower().split())
+        for turn in self.turns[-window:]:
+            old_words = set(turn.narrator_text.lower().split())
+            if not new_words or not old_words:
+                continue
+            overlap = len(new_words & old_words) / len(new_words | old_words)
+            if overlap > 0.6:
+                return True
+        return False
 
     def generate_report(self) -> PlaytestReport:
         """Compile all logged data into a PlaytestReport."""
         ...
 ```
+
+---
+
+## 5.4 Crash Resilience
+
+The playtest framework must handle two failure modes:
+
+**In-process errors** (LLM timeout, parse failure, unexpected exception): These are caught by the `try/except` in `PlaytestRunner.run()`. When `stop_on_error=False`, the error is logged and the loop continues to the next turn. When `stop_on_error=True`, the loop breaks and the report is generated from whatever data was collected.
+
+**Process crashes** (OOM kill, SIGKILL, power failure): The `PlaytestLogger.flush_to_disk()` method writes raw data files (conversation, errors, timing) to the output directory after every turn. If the process dies, the partial data on disk can be inspected manually. The final `report.md` will be missing, but the YAML data files will contain everything up to the last completed turn. To generate a report from partial data after a crash:
+
+```bash
+uv run python scripts/playtest.py --resume playtests/2026-03-20T14-30-00/
+```
+
+The `--resume` flag loads partial data from the specified directory, generates a report from it, and optionally continues the playtest from where it left off (if the save still exists).
 
 ---
 
@@ -681,6 +712,9 @@ Write tests:
 - Test the loop terminates on `max_turns`
 - Test the loop terminates on `game_over`
 - Test error logging when an exception is raised
+- Test that the opening narration runs before the first player turn (turn 0)
+- Test that `flush_to_disk` writes partial data after each turn
+- Test that `--resume` can load and report on partial playtest data
 
 ### Step 5: Report Generator
 
@@ -728,6 +762,8 @@ def main():
     parser.add_argument("--stop-on-error", action="store_true", help="Stop on first error")
     parser.add_argument("--edge-case-freq", type=float, default=0.15,
                         help="Frequency of edge case actions (0.0 to 1.0)")
+    parser.add_argument("--resume", type=str, default=None,
+                        help="Resume/report from a partial playtest directory")
     args = parser.parse_args()
 
     config = PlaytestConfig(
@@ -791,7 +827,7 @@ Phase 05 Part 2 is complete when:
 
 1. `uv run python scripts/playtest.py --game lost-island --turns 5` runs without crashing
 2. A timestamped directory appears in `playtests/` with all expected files
-3. `report.md` contains: summary, issues table, timing stats, chapter progress, memory state
+3. `report.md` contains: summary, issues table, timing stats, per-turn detail, chapter progress, memory state
 4. `conversation.yaml` contains the full conversation with correct turn numbers and roles
 5. `thinking.yaml` captures thinking tokens from narrator, character, and memory agents
 6. The player agent produces varied, in-character responses (not the same thing every turn)
@@ -799,6 +835,9 @@ Phase 05 Part 2 is complete when:
 8. Issue detection catches repetition (verified by injecting duplicate narrator text)
 9. A 20-turn playtest produces a coherent narrative (human review of the report)
 10. Errors are logged but do not crash the runner when `stop_on_error=False`
+11. The opening narration (turn 0, no player input) runs before the first player action
+12. Partial playtest data is saved to disk after each turn (crash resilience)
+13. `--resume` flag generates a report from a partial/interrupted playtest directory
 
 ### 7.3 Live Testing & Regression Capture
 

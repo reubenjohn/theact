@@ -296,14 +296,23 @@ async def run_turn(
     )
 
     # Unpack results
+    import logging
+    logger = logging.getLogger(__name__)
+
     memory_diffs: list[MemoryDiff] = []
     for result in all_results[:-1]:  # all except last (state check)
         if isinstance(result, Exception):
-            continue  # log warning, skip this memory update
+            logger.warning(
+                f"Post-turn agent failed: {type(result).__name__}: {result}"
+            )
+            continue
         memory_diffs.append(result)
 
     state_result = all_results[-1]
     if isinstance(state_result, Exception):
+        logger.warning(
+            f"Post-turn agent failed: {type(state_result).__name__}: {state_result}"
+        )
         state_result = GameStateResult(
             chapter_complete=False,
             reason="Game state check failed",
@@ -324,28 +333,29 @@ async def run_turn(
         game.conversation.append(entry)
         append_conversation(game.save_path, entry)
 
-    # Save updated state
-    save_state(game.save_path, game.state)
-
-    # Save updated memories
-    for char_id, mem in game.memories.items():
-        save_memory(game.save_path, mem)
-
     # ── Step 5: Chapter Advancement ──────────────────────────────────
 
     chapter_advanced = False
     new_chapter = None
 
-    if state_result.chapter_complete:
+    # Skip chapter advancement if the game is already complete
+    if state_result.chapter_complete and not game.state.game_complete:
         chapter_advanced, new_chapter = await _advance_chapter(
-            game, entries, llm_config,
+            game, llm_config,
         )
 
     # ── Step 6: Rolling Summary (if needed) ──────────────────────────
 
     await _maybe_update_rolling_summary(game, llm_config)
 
-    # ── Step 7: Git Commit ───────────────────────────────────────────
+    # ── Step 7: Persist + Git Commit ────────────────────────────────
+
+    # Single save point: write all state, memories, and summaries to disk
+    # just before the git commit. This avoids multiple save_state calls
+    # scattered across helper functions and keeps the write atomic.
+    save_state(game.save_path, game.state)
+    for char_id, mem in game.memories.items():
+        save_memory(game.save_path, mem)
 
     commit_summary = narrator_output.narration[:60].replace("\n", " ")
     commit_turn(game.save_path, new_turn, commit_summary)
@@ -362,6 +372,27 @@ async def run_turn(
     )
 
 
+def _fuzzy_match(target: str, candidates: list[str]) -> int | None:
+    """Find the best fuzzy match for target in candidates.
+
+    Uses case-insensitive, whitespace-normalized comparison.
+    Returns the index of the matching candidate, or None if no match.
+
+    NOTE: Exact string matching is unreliable with 7B models — the model
+    rarely reproduces existing fact text verbatim. In practice, the
+    `summary` replacement is the reliable memory evolution mechanism,
+    and `add` is reliable, but `remove`/`update` may miss.
+    """
+    def normalize(s: str) -> str:
+        return " ".join(s.lower().split())
+
+    norm_target = normalize(target)
+    for i, candidate in enumerate(candidates):
+        if normalize(candidate) == norm_target:
+            return i
+    return None
+
+
 def _apply_memory_diff(game: LoadedGame, diff: MemoryDiff) -> None:
     """Apply a MemoryDiff to the in-memory game state."""
     char_id = diff.character
@@ -375,17 +406,18 @@ def _apply_memory_diff(game: LoadedGame, diff: MemoryDiff) -> None:
 
     mem = game.memories[char_id]
 
-    # Remove facts
+    # Remove facts (fuzzy match -- 7B models rarely reproduce text exactly)
     for fact in diff.remove:
-        if fact in mem.key_facts:
-            mem.key_facts.remove(fact)
+        idx = _fuzzy_match(fact, mem.key_facts)
+        if idx is not None:
+            mem.key_facts.pop(idx)
 
-    # Update facts
+    # Update facts (fuzzy match)
     for upd in diff.update:
         old = upd.get("old", "")
         new = upd.get("new", "")
-        if old in mem.key_facts:
-            idx = mem.key_facts.index(old)
+        idx = _fuzzy_match(old, mem.key_facts)
+        if idx is not None:
             mem.key_facts[idx] = new
 
     # Add facts
@@ -404,18 +436,18 @@ def _apply_memory_diff(game: LoadedGame, diff: MemoryDiff) -> None:
 
 async def _advance_chapter(
     game: LoadedGame,
-    turn_entries: list[ConversationEntry],
     llm_config: LLMConfig,
 ) -> tuple[bool, str | None]:
     """Handle chapter completion: generate summary, advance state."""
     current = game.chapters.get(game.state.current_chapter)
     if not current or not current.next:
+        # Final chapter — mark the game as complete
+        if current:
+            game.state.game_complete = True
         return False, None
 
     # Generate chapter summary via summarizer
-    summary_messages = build_summary_messages(
-        game, current, turn_entries,
-    )
+    summary_messages = build_summary_messages(game, current)
     chapter_summary_text = await run_summarization(summary_messages, llm_config)
 
     # Create and save chapter summary
@@ -431,7 +463,9 @@ async def _advance_chapter(
     game.state.current_chapter = current.next
     game.state.beats_hit = []
     game.state.chapter_history.append(current.id)
-    save_state(game.save_path, game.state)
+    game.state.chapter_just_advanced = True
+    # NOTE: save_state is NOT called here — all saves are consolidated
+    # in run_turn just before the git commit (single write, atomic).
 
     return True, current.next
 
@@ -440,12 +474,22 @@ async def _maybe_update_rolling_summary(
     game: LoadedGame,
     llm_config: LLMConfig,
 ) -> None:
-    """Trigger rolling summarization if conversation exceeds token budget."""
+    """Trigger rolling summarization if conversation exceeds token budget.
+
+    NOTE: We only count entries added since the last summarization
+    (game.state.last_summarized_turn). Without this, the token count for
+    the full conversation always exceeds the threshold after the first
+    summary, causing a summarization LLM call on every single turn.
+    """
     SUMMARY_THRESHOLD = 1500  # tokens of conversation history before trimming
     KEEP_RECENT = 4           # number of recent turns to keep verbatim
 
-    # Estimate tokens in full conversation
-    conv_text = "\n".join(e.content for e in game.conversation)
+    # Only count entries added since the last summarization
+    new_entries = [
+        e for e in game.conversation
+        if e.turn > game.state.last_summarized_turn
+    ]
+    conv_text = "\n".join(e.content for e in new_entries)
     conv_tokens = estimate_tokens(conv_text)
 
     if conv_tokens <= SUMMARY_THRESHOLD:
@@ -473,7 +517,13 @@ async def _maybe_update_rolling_summary(
     new_summary = await run_summarization(summary_messages, llm_config)
 
     game.state.rolling_summary = new_summary
-    save_state(game.save_path, game.state)
+
+    # Record which turn we summarized up to, so we don't re-count
+    # already-summarized entries on the next turn.
+    cutoff_turn = max(e.turn for e in old_entries)
+    game.state.last_summarized_turn = cutoff_turn
+    # NOTE: save_state is NOT called here — all saves are consolidated
+    # in run_turn just before the git commit (single write, atomic).
 ```
 
 ---
@@ -613,24 +663,35 @@ def build_narrator_messages(
 
     messages: list[Message] = [{"role": "system", "content": system}]
 
-    # Include rolling summary if available
+    # Merge rolling summary, recent conversation, and player input into a
+    # SINGLE user message. Some APIs merge or behave unpredictably with
+    # multiple consecutive same-role messages, so we consolidate here.
+    user_parts: list[str] = []
+
     if game.state.rolling_summary:
-        messages.append({
-            "role": "user",
-            "content": f"Story so far: {game.state.rolling_summary}",
-        })
+        user_parts.append(f"Story so far: {game.state.rolling_summary}")
 
-    # Include recent conversation
     if recent_text:
-        messages.append({
-            "role": "user",
-            "content": f"Recent conversation:\n{recent_text}",
-        })
+        user_parts.append(f"Recent conversation:\n{recent_text}")
 
-    # Current player input
+    # Opening scene guidance (Issue 1.4)
+    if not game.conversation and game.state.turn == 0:
+        user_parts.append(
+            "This is the opening scene. Set the stage and introduce the setting."
+        )
+
+    # Chapter transition signal (Issue 6.2)
+    if game.state.chapter_just_advanced:
+        user_parts.append(
+            "The previous chapter is complete. Begin the new chapter "
+            "with a transition scene."
+        )
+
+    user_parts.append(f"Player says: {player_input}")
+
     messages.append({
         "role": "user",
-        "content": f"Player says: {player_input}",
+        "content": "\n\n".join(user_parts),
     })
 
     # Token budget check -- trim recent conversation if needed
@@ -642,21 +703,26 @@ def build_narrator_messages(
         # Retry with fewer turns
         recent = _get_recent_conversation(game.conversation, max_turns=2)
         recent_text = _format_conversation(recent)
-        messages = [{"role": "system", "content": system}]
+        user_parts_trimmed: list[str] = []
         if game.state.rolling_summary:
-            messages.append({
-                "role": "user",
-                "content": f"Story so far: {game.state.rolling_summary}",
-            })
+            user_parts_trimmed.append(
+                f"Story so far: {game.state.rolling_summary}"
+            )
         if recent_text:
-            messages.append({
-                "role": "user",
-                "content": f"Recent:\n{recent_text}",
-            })
-        messages.append({
-            "role": "user",
-            "content": f"Player says: {player_input}",
-        })
+            user_parts_trimmed.append(f"Recent:\n{recent_text}")
+        if game.state.chapter_just_advanced:
+            user_parts_trimmed.append(
+                "The previous chapter is complete. Begin the new chapter "
+                "with a transition scene."
+            )
+        user_parts_trimmed.append(f"Player says: {player_input}")
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": "\n\n".join(user_parts_trimmed)},
+        ]
+
+    # Reset chapter transition flag after building messages
+    game.state.chapter_just_advanced = False
 
     return messages
 
@@ -794,9 +860,12 @@ def build_game_state_messages(
 def build_summary_messages(
     game: LoadedGame,
     chapter: Chapter,
-    turn_entries: list[ConversationEntry],
 ) -> list[Message]:
-    """Build messages for generating a chapter summary."""
+    """Build messages for generating a chapter summary.
+
+    NOTE: Recent conversation is fetched directly from game.conversation
+    rather than passed in, since the turn_entries parameter was unused.
+    """
     recent = _get_recent_conversation(game.conversation, max_turns=6)
     recent_text = _format_conversation(recent)
 
@@ -889,7 +958,7 @@ responding_characters:
 mood: tense
 ```
 
-RULES:
+OUTPUT RULES:
 - Only list characters from ACTIVE CHARACTERS.
 - responding_characters can be empty if no one speaks.
 - mood is one of: tense, calm, urgent, mysterious, humorous, dramatic, melancholic.
@@ -911,7 +980,7 @@ Write {name}'s response to what just happened. Dialogue and actions only.
 50-150 words. Stay in character. Do not narrate for others.
 Do not use quotation marks around actions — write actions as plain text.
 
-Example:
+Example format (for illustration only):
 She sets down the wrench and wipes her hands on her jeans. "Three days. That's how long the water will last if we're careful." She glances toward the tree line. "Less if we're not.\""""
 
 # ─── MEMORY UPDATE ───────────────────────────────────────────────────────
@@ -926,10 +995,6 @@ Do NOT include things {name} would not know.
 Output a YAML block:
 
 ```yaml
-summary: |
-  Updated 3-5 sentence summary of what {name} knows, feels, and has experienced.
-  Merge new information into the existing summary. Do not repeat old details
-  unless still relevant.
 add:
   - "New fact {name} learned or experienced"
 remove:
@@ -937,6 +1002,10 @@ remove:
 update:
   - old: "Exact text of existing fact"
     new: "Corrected or updated version"
+summary: |
+  Updated 3-5 sentence summary of what {name} knows, feels, and has experienced.
+  Merge new information into the existing summary. Do not repeat old details
+  unless still relevant.
 ```
 
 RULES:
@@ -1268,13 +1337,15 @@ Chapter advancement occurs within the turn engine when the game state agent retu
    - `beats_hit` = `[]` (reset for the new chapter)
    - `chapter_history` appends the completed chapter's id
 
+> **GameState additions from this phase:** `rolling_summary: str = ""`, `last_summarized_turn: int = 0`, `game_complete: bool = False`, `chapter_just_advanced: bool = False`
+
 4. **Save state.** Updated `state.yaml` is written to disk.
 
 5. **Return to caller.** The `TurnResult` includes `chapter_advanced=True` and `new_chapter` with the new chapter's id, so the CLI can display a chapter transition message.
 
 ### 7.3 Final Chapter Handling
 
-If the completed chapter has `next: null`, no advancement occurs. The `_advance_chapter` function returns `(False, None)`. The game effectively ends. Phase 04 (CLI) will handle displaying an end-of-game message based on this.
+If the completed chapter has `next: null`, no advancement occurs. The `_advance_chapter` function sets `game.state.game_complete = True` and returns `(False, None)`. Once `game_complete` is True, `run_turn` skips the game state check to avoid redundant completion detection. Phase 04 (CLI) will handle displaying an end-of-game message based on `game.state.game_complete`.
 
 ---
 

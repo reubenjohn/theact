@@ -626,9 +626,13 @@ class GameSession:
 
     async def run(self):
         """Main gameplay loop."""
-        # If this is a fresh game (turn 0), run the opening turn
         if self.game.state.turn == 0:
+            # Fresh game — run the opening narration automatically
             await self._play_turn("[game start]")
+        else:
+            # Resuming a saved game — show recent context so the player
+            # knows where they left off
+            self._show_recap()
 
         while True:
             player_input = self._get_input()
@@ -681,6 +685,31 @@ class GameSession:
     async def _handle_command(self, cmd: str, args: list[str]) -> bool:
         """Execute a slash command. Returns True if session should end."""
         ...  # delegates to commands.py functions
+
+    def _show_recap(self):
+        """Show the last few conversation entries so the player has context."""
+        entries = self.game.conversation[-5:]  # last 5 entries
+        if not entries:
+            return
+        self.console.print()
+        self.console.print("  Previously...", style=Style(dim=True, italic=True))
+        self.console.print()
+        for entry in entries:
+            if entry.role == "narrator":
+                # Show truncated narrator text
+                text = entry.content[:200] + ("..." if len(entry.content) > 200 else "")
+                self.console.print(Text(f"  {text}", style=NARRATOR_STYLE))
+            elif entry.role == "player":
+                line = Text(f"  {self.game.state.player_name}: ", style=PLAYER_STYLE)
+                line.append(entry.content)
+                self.console.print(line)
+            elif entry.role == "character":
+                name = entry.character or "?"
+                color = get_character_color(name, list(self.game.characters.keys()))
+                self.console.print(Text(f"  {name}: ", style=Style(color=color, bold=True)), end="")
+                text = entry.content[:200] + ("..." if len(entry.content) > 200 else "")
+                self.console.print(Text(text, style=Style(color=color)))
+        self.console.print()
 
     def _current_chapter_title(self) -> str:
         chapter_id = self.game.state.current_chapter
@@ -1035,7 +1064,7 @@ Phase 04 is complete when all of the following work:
 
 1. **Launch and menu**: `uv run python main.py` shows the banner and main menu
 2. **New game flow**: Select "New Game" → pick a game → enter save name → enter player name → see opening narration stream in
-3. **Continue game flow**: Select "Continue" → pick a save → resume at correct turn → type input → see narrator and character responses stream in
+3. **Continue game flow**: Select "Continue" → pick a save → see "Previously..." recap with last few conversation entries → resume at correct turn → type input → see narrator and character responses stream in
 4. **Streaming quality**: Tokens appear smoothly without flickering. Thinking is gray/dimmed. Narrator is white/italic. Characters have distinct colors and bold names.
 5. **All slash commands**:
    - `/help` — shows command table
@@ -1051,6 +1080,9 @@ Phase 04 is complete when all of the following work:
    - `/memory unknown` — shows error with available names
    - `/think off` — hides thinking on next turn
    - `/think on` — shows thinking again
+   - `/retry` — undoes last turn and replays same input
+   - `/conversation` — shows last 5 conversation entries
+   - `/conversation 10` — shows last 10 entries
 6. **Empty input**: Pressing enter without text re-shows the prompt
 7. **Ctrl+C**: Catches interrupt, prints farewell, exits cleanly
 8. **Ctrl+D**: Treats as quit
@@ -1114,7 +1146,7 @@ dependencies = [
 | Rich Feature | Where Used |
 |---|---|
 | `Console` | All output — `print()`, `input()`, `status()` |
-| `Console.print(end="")` | Streaming token display |
+| `Console.print(Text(...), end="")` | Streaming token display (use `Text` objects, never raw strings — LLM output contains brackets that Rich would misinterpret as markup) |
 | `Console.status()` | Post-processing spinner |
 | `Console.input()` | Player input with styled prompt |
 | `Rule` | Turn separators with labels |
