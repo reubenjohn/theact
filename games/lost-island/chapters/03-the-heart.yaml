@@ -1,0 +1,21 @@
+id: 03-the-heart
+title: The Heart
+summary: >
+  The group descends into caves beneath the ruins. The walls grow warm
+  and pulse with light. In the deepest chamber -- the Heart -- the island
+  reveals itself as something vast, ancient, and aware. It is not hostile.
+  It is lonely. It offers connection. The player must choose: accept the
+  island's offer, sever the connection, or find a middle path.
+beats:
+  - Group enters the cave system on the western slope
+  - Caves grow warmer and the walls begin to pulse with light
+  - Joaquin reveals the full truth about his previous visit
+  - The Heart chamber -- the island communicates through sensation
+  - Maya is tempted by what the island offers her mind
+  - The player makes a final choice about the island's fate
+completion: >
+  The player has reached the Heart and made a choice about the island.
+characters:
+  - maya
+  - joaquin
+next: null

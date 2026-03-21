@@ -1,10 +1,10 @@
 id: lost-island
 title: The Lost Island
-description: Survivors of a plane crash on an uncharted island discover something ancient beneath the jungle.
+description: Survivors of a plane crash on an uncharted island discover ancient ruins and a secret buried beneath the jungle.
 characters:
   - maya
   - joaquin
 chapters:
   - 01-the-crash
-  - 02-survival
-  - 03-the-discovery
+  - 02-the-discovery
+  - 03-the-heart
