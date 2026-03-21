@@ -15,7 +15,7 @@ class LLMConfig:
     api_key: str = ""  # loaded from env
     model: str = "olafangensan-glm-4.7-flash-heretic"
     default_temperature: float = 1.0
-    default_max_tokens: int = 900
+    default_max_tokens: int = 1500
     context_limit: int = 8192  # model's context window size
 
 
@@ -30,37 +30,39 @@ class AgentLLMConfig:
     retry_temperature_bump: float = 0.1  # increase temp on each retry
 
 
-# Sensible defaults for each agent type
+# Sensible defaults for each agent type.
+# NOTE: This is a thinking model — thinking tokens count against max_tokens.
+# Budget must include ~500-1500 tokens for reasoning PLUS the actual content.
 NARRATOR_CONFIG = AgentLLMConfig(
     temperature=1.0,
-    max_tokens=600,
+    max_tokens=2000,
     structured=True,
     max_retries=2,
 )
 
 CHARACTER_CONFIG = AgentLLMConfig(
     temperature=1.0,
-    max_tokens=400,
+    max_tokens=1500,
     structured=False,
 )
 
 MEMORY_UPDATE_CONFIG = AgentLLMConfig(
     temperature=0.3,
-    max_tokens=500,
+    max_tokens=1500,
     structured=True,
     max_retries=2,
 )
 
 GAME_STATE_CONFIG = AgentLLMConfig(
     temperature=0.2,
-    max_tokens=200,
+    max_tokens=1000,
     structured=True,
     max_retries=2,
 )
 
 SUMMARIZER_CONFIG = AgentLLMConfig(
     temperature=0.3,
-    max_tokens=300,
+    max_tokens=1000,
     structured=False,
 )
 
