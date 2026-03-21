@@ -51,6 +51,22 @@ class MenuBuilder:
             self._build_new_game_section()
             ui.separator()
             self._build_saves_table()
+            ui.separator()
+            with ui.row().classes("w-full items-center gap-2"):
+                ui.label("Tools").style(
+                    "font-size: 1.2em; font-weight: bold; color: #ccc; margin-top: 12px;"
+                )
+            with ui.row().classes("w-full gap-2"):
+                ui.button(
+                    "Playtest Dashboard",
+                    on_click=lambda: ui.navigate.to("/playtest"),
+                    icon="science",
+                ).props("dense")
+                ui.button(
+                    "Diagnostics",
+                    on_click=lambda: ui.navigate.to("/diagnostics"),
+                    icon="analytics",
+                ).props("dense")
 
     def _build_banner(self) -> None:
         """Render the title banner with settings link."""
@@ -183,12 +199,20 @@ class MenuBuilder:
 
                     def make_load_handler(sid: str):
                         async def handler():
+                            loading = ui.row().classes("items-center gap-2")
+                            with loading:
+                                ui.spinner("dots", size="sm")
+                                ui.label("Loading...").style(
+                                    "color: #888; font-size: 0.8em;"
+                                )
                             try:
                                 game = load_save(sid)
                                 ui.notify(f"Loaded save: {sid}", type="positive")
                                 self._on_load_game(game)
                             except Exception as e:
                                 ui.notify(f"Error loading save: {e}", type="negative")
+                            finally:
+                                loading.delete()
 
                         return handler
 

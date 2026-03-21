@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from theact.engine.turn import run_turn
@@ -11,7 +12,7 @@ from theact.engine.types import TurnResult
 from theact.io.save_manager import create_save, load_save
 from theact.llm.call_log import LLMCallLog
 from theact.playtest.config import PlaytestConfig
-from theact.playtest.logger import PlaytestLogger
+from theact.playtest.logger import PlaytestLogger, TurnLog
 from theact.playtest.player_agent import PlayerAgent
 from theact.playtest.report import (
     PlaytestReport,
@@ -39,8 +40,18 @@ class PlaytestRunner:
         )
         self._quality_scores: list[dict] = []
 
-    async def run(self) -> PlaytestReport:
-        """Execute a full playtest. Returns a PlaytestReport."""
+    async def run(
+        self,
+        on_turn_complete: Callable[[int, TurnLog, dict | None], None] | None = None,
+    ) -> PlaytestReport:
+        """Execute a full playtest. Returns a PlaytestReport.
+
+        Args:
+            on_turn_complete: Optional callback invoked after each turn completes.
+                Receives (turn_number, turn_log, quality_score_dict). The quality
+                score dict contains at minimum a "composite" key, or is None if
+                scoring is unavailable. Used by the web UI for progress updates.
+        """
         run_start = time.monotonic()
 
         # 1. Create a fresh save from the game definition
@@ -118,6 +129,15 @@ class PlaytestRunner:
 
                 # Compute quality score for this turn
                 self._compute_quality_score(turn_num, result, game)
+
+                # Invoke progress callback if provided
+                if on_turn_complete is not None:
+                    turn_log = self.logger.turns[-1] if self.logger.turns else None
+                    quality_score = (
+                        self._quality_scores[-1] if self._quality_scores else None
+                    )
+                    if turn_log is not None:
+                        on_turn_complete(turn_num, turn_log, quality_score)
 
                 # Check chapter completion
                 if result.chapter_advanced:

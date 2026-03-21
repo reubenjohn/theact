@@ -97,3 +97,17 @@ def setup_app() -> None:
         from theact.web.settings import build_settings_page
 
         build_settings_page(on_back=lambda: ui.navigate.to("/"))
+
+    @ui.page("/diagnostics")
+    async def diagnostics_page(save: str = ""):
+        """Diagnostics and observability viewer."""
+        from theact.web.diagnostics_viewer import build_diagnostics_page
+
+        build_diagnostics_page(save_id=save)
+
+    @ui.page("/playtest")
+    async def playtest():
+        """Playtest dashboard page."""
+        from theact.web.playtest_dashboard import playtest_page
+
+        await playtest_page()
