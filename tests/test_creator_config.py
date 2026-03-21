@@ -46,6 +46,27 @@ class TestCreatorLLMConfig:
         config = CreatorLLMConfig(model="Some-HERETIC-Model")
         assert config.is_small_model is True
 
+    def test_max_tokens_for_small_model(self):
+        config = CreatorLLMConfig(model=_GAMEPLAY_MODEL)
+        assert config.max_tokens_for("world") == 800
+        assert config.max_tokens_for("character") == 800
+        assert config.max_tokens_for("chapter") == 1000
+        assert config.max_tokens_for("fix") == 600
+        assert config.max_tokens_for("proposal") == 1500
+
+    def test_max_tokens_for_large_model(self):
+        config = CreatorLLMConfig(model="gpt-4o")
+        assert config.max_tokens_for("world") == 4096
+        assert config.max_tokens_for("proposal") == 1500
+
+    def test_generation_temperature_small_model(self):
+        config = CreatorLLMConfig(model=_GAMEPLAY_MODEL)
+        assert config.generation_temperature == 0.5
+
+    def test_generation_temperature_large_model(self):
+        config = CreatorLLMConfig(model="gpt-4o")
+        assert config.generation_temperature == 0.7
+
 
 class TestLoadCreatorConfig:
     def test_missing_api_key_raises(self, monkeypatch):

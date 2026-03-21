@@ -35,13 +35,21 @@ def serialize_game_data(data: dict) -> str:
     )
 
 
-def _extract_yaml(response_text: str) -> dict:
+def _strip_think_tags(text: str) -> str:
+    """Remove <think>...</think> tags from text, keeping surrounding content."""
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+
+
+def extract_yaml(response_text: str) -> dict:
     """Extract YAML from an LLM response, handling fenced or raw YAML.
 
+    Strips <think>...</think> tags before parsing.
     Returns the parsed dict. Raises YAMLParseError on failure.
     """
-    match = re.search(r"```(?:yaml)?\s*\n(.*?)```", response_text, re.DOTALL)
-    yaml_text = match.group(1) if match else response_text
+    cleaned = _strip_think_tags(response_text)
+
+    match = re.search(r"```(?:yaml)?\s*\n(.*?)```", cleaned, re.DOTALL)
+    yaml_text = match.group(1) if match else cleaned
 
     try:
         data = yaml.safe_load(yaml_text)
@@ -60,7 +68,7 @@ def _extract_yaml(response_text: str) -> dict:
     return data
 
 
-def _parse_proposal_response(response_text: str) -> dict:
+def parse_proposal_response(response_text: str) -> dict:
     """Extract and parse a proposal YAML from the LLM response.
 
     The proposal has keys: title, id, setting, tone, rules, characters, chapters.
@@ -71,7 +79,7 @@ def _parse_proposal_response(response_text: str) -> dict:
     Raises:
         YAMLParseError: if YAML cannot be extracted or parsed
     """
-    data = _extract_yaml(response_text)
+    data = extract_yaml(response_text)
 
     required_keys = {"title", "id", "characters", "chapters"}
     missing = required_keys - set(data.keys())
@@ -81,7 +89,7 @@ def _parse_proposal_response(response_text: str) -> dict:
     return data
 
 
-def _parse_generation_response(response_text: str) -> dict:
+def parse_generation_response(response_text: str) -> dict:
     """Extract and parse YAML from the LLM's generation response.
 
     Returns:
@@ -90,7 +98,7 @@ def _parse_generation_response(response_text: str) -> dict:
     Raises:
         YAMLParseError: if YAML cannot be extracted or parsed
     """
-    data = _extract_yaml(response_text)
+    data = extract_yaml(response_text)
 
     required_keys = {"game", "world", "characters", "chapters"}
     missing = required_keys - set(data.keys())
@@ -98,6 +106,12 @@ def _parse_generation_response(response_text: str) -> dict:
         raise YAMLParseError(f"YAML is missing required top-level keys: {missing}")
 
     return data
+
+
+# Backward-compatible aliases for internal callers
+_extract_yaml = extract_yaml
+_parse_proposal_response = parse_proposal_response
+_parse_generation_response = parse_generation_response
 
 
 async def generate_game_files(
@@ -137,7 +151,7 @@ async def generate_game_files(
         response_text = await call_llm(client, config, messages)
 
         try:
-            return _parse_generation_response(response_text)
+            return parse_generation_response(response_text)
         except YAMLParseError as e:
             last_error = e
             if attempt < MAX_ATTEMPTS - 1:

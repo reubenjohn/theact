@@ -4,6 +4,7 @@ import pytest
 
 from theact.creator.generator import (
     YAMLParseError,
+    extract_yaml,
     _parse_generation_response,
     _parse_proposal_response,
 )
@@ -133,3 +134,25 @@ class TestParseProposalResponse:
     def test_malformed_yaml_raises(self):
         with pytest.raises(YAMLParseError):
             _parse_proposal_response("```yaml\n{bad: [yaml\n```")
+
+
+class TestExtractYaml:
+    def test_public_function_works(self):
+        result = extract_yaml("key: value\n")
+        assert result == {"key": "value"}
+
+    def test_strips_think_tags(self):
+        text = "<think>reasoning here</think>```yaml\nkey: value\n```"
+        result = extract_yaml(text)
+        assert result == {"key": "value"}
+
+    def test_strips_multiline_think_tags(self):
+        text = "<think>\nlong\nreasoning\n</think>\nkey: value\n"
+        result = extract_yaml(text)
+        assert result == {"key": "value"}
+
+    def test_backward_compatible_alias(self):
+        from theact.creator.generator import _extract_yaml
+
+        result = _extract_yaml("key: value\n")
+        assert result == {"key": "value"}

@@ -24,8 +24,15 @@ class CreatorLLMConfig:
     api_key: str = ""
     model: str = ""
     temperature: float = 0.7  # moderate creativity for game design
-    max_tokens: int = 4096  # full generation needs space
+    max_tokens: int = 4096  # large model default
     proposal_max_tokens: int = 1500  # proposals are shorter
+
+    # Small model overrides (applied when is_small_model is True)
+    small_model_world_max_tokens: int = 800
+    small_model_character_max_tokens: int = 800
+    small_model_chapter_max_tokens: int = 1000
+    small_model_fix_max_tokens: int = 600
+    small_model_temperature: float = 0.5
 
     @property
     def is_small_model(self) -> bool:
@@ -33,6 +40,27 @@ class CreatorLLMConfig:
         Game creation requires a larger, more capable model.
         """
         return "heretic" in self.model.lower()
+
+    def max_tokens_for(self, call_type: str) -> int:
+        """Return max_tokens for the given call type.
+
+        call_type: "world", "character", "chapter", "fix", or "proposal"
+        """
+        if not self.is_small_model:
+            return (
+                self.max_tokens if call_type != "proposal" else self.proposal_max_tokens
+            )
+        return {
+            "world": self.small_model_world_max_tokens,
+            "character": self.small_model_character_max_tokens,
+            "chapter": self.small_model_chapter_max_tokens,
+            "fix": self.small_model_fix_max_tokens,
+            "proposal": self.proposal_max_tokens,
+        }.get(call_type, self.small_model_world_max_tokens)
+
+    @property
+    def generation_temperature(self) -> float:
+        return self.small_model_temperature if self.is_small_model else self.temperature
 
 
 # The 7B model used for gameplay -- game creation should NOT use this.

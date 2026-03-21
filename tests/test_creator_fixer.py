@@ -1,4 +1,4 @@
-"""Tests for creator fixer (validation error fix loop)."""
+"""Tests for creator fixer (per-file validation error fix loop)."""
 
 from __future__ import annotations
 
@@ -91,9 +91,14 @@ class TestFixValidationErrors:
         result = validate_game_data(data)
         assert not result.valid
 
-        # The LLM returns a fixed version
-        fixed = _valid_game_data()
-        fixed_yaml = yaml.dump(fixed, default_flow_style=False, sort_keys=False)
+        # The per-file fixer sends only the world data and expects
+        # the fixed world data back (not the entire game)
+        fixed_world = {
+            "setting": "A dark forest.",
+            "tone": "Second person, present tense.",
+            "rules": "No magic.",
+        }
+        fixed_yaml = yaml.dump(fixed_world, default_flow_style=False, sort_keys=False)
         response = f"```yaml\n{fixed_yaml}```"
 
         client = _make_mock_client([response])
@@ -109,8 +114,9 @@ class TestFixValidationErrors:
         result = validate_game_data(data)
         assert not result.valid
 
-        # The LLM always returns the same broken data
-        broken_yaml = yaml.dump(data, default_flow_style=False, sort_keys=False)
+        # The LLM always returns the same broken world data (missing setting)
+        broken_world = {"tone": "Second person.", "rules": "No magic."}
+        broken_yaml = yaml.dump(broken_world, default_flow_style=False, sort_keys=False)
         response = f"```yaml\n{broken_yaml}```"
 
         client = _make_mock_client([response] * MAX_FIX_ATTEMPTS)
@@ -125,9 +131,13 @@ class TestFixValidationErrors:
         result = validate_game_data(data)
         assert not result.valid
 
-        # LLM returns garbage YAML, then valid YAML
-        fixed = _valid_game_data()
-        fixed_yaml = yaml.dump(fixed, default_flow_style=False, sort_keys=False)
+        # LLM returns garbage YAML, then valid per-file YAML
+        fixed_world = {
+            "setting": "A dark forest.",
+            "tone": "Second person, present tense.",
+            "rules": "No magic.",
+        }
+        fixed_yaml = yaml.dump(fixed_world, default_flow_style=False, sort_keys=False)
 
         client = _make_mock_client(
             [

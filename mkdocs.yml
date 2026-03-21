@@ -86,3 +86,4 @@ nav:
     - Phase 09 - Observability: plans/09-ObservabilityAndDiagnostics.md
     - Phase 10 - Save Versioning: plans/10-SaveVersioningAndTurnDebugger.md
     - Phase 11 - Small Model Hardening: plans/11-SmallModelHardening.md
+    - Phase 12 - Creator Hardening: plans/12-CreatorSmallModelHardening.md
