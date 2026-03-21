@@ -6,7 +6,14 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from git import Repo
+from git import GitCommandError, Repo
+
+# Regex for parsing turn number from commit messages.
+# All turn commits follow the format "Turn N: <summary>".
+_TURN_RE = re.compile(r"Turn (\d+):")
+
+# Mutable state files tracked by peek/diff operations.
+_STATE_FILES = ["state.yaml", "conversation.yaml", "summaries.yaml"]
 
 
 @dataclass
@@ -69,6 +76,9 @@ def undo(save_path: Path, steps: int = 1) -> int:
     Returns the turn number we've rewound to.
     Raises ValueError if steps exceeds available history (excluding initial commit).
     """
+    if steps < 1:
+        raise ValueError("Steps must be at least 1")
+
     repo = Repo(save_path)
 
     # Count turn commits (all commits except the initial one)
@@ -80,16 +90,12 @@ def undo(save_path: Path, steps: int = 1) -> int:
             f"Cannot undo {steps} steps: only {turn_commits} turn(s) in history"
         )
 
-    if steps < 1:
-        raise ValueError("Steps must be at least 1")
-
     # Reset to HEAD~N
     repo.git.reset("--hard", f"HEAD~{steps}")
 
-    # Determine what turn we're now at
-    # Parse from the current HEAD commit message
+    # Determine what turn we're now at from the current HEAD commit message
     head_msg = repo.head.commit.message.strip()
-    turn_match = re.match(r"Turn (\d+):", head_msg)
+    turn_match = _TURN_RE.match(head_msg)
     if turn_match:
         return int(turn_match.group(1))
     else:
@@ -108,7 +114,7 @@ def get_history(save_path: Path) -> list[TurnInfo]:
 
     for commit in repo.iter_commits():
         msg = commit.message.strip()
-        turn_match = re.match(r"Turn (\d+):", msg)
+        turn_match = _TURN_RE.match(msg)
         if not turn_match:
             continue  # Skip initial commit
 
@@ -160,7 +166,7 @@ def save_as(save_path: Path, new_save_id: str, saves_dir: Path | None = None) ->
     return target_dir
 
 
-def _resolve_turn_ref(save_path: Path, turn_number: int) -> str:
+def _resolve_turn_ref(repo: Repo, history: list[TurnInfo], turn_number: int) -> str:
     """Resolve a turn number to a git commit ref (hex SHA).
 
     Turn 0 = the initial commit (before any turns).
@@ -168,9 +174,6 @@ def _resolve_turn_ref(save_path: Path, turn_number: int) -> str:
 
     Raises ValueError if the turn number is out of range.
     """
-    repo = Repo(save_path)
-    history = get_history(save_path)
-
     if turn_number == 0:
         # Find the initial commit (the oldest one, which has no Turn prefix)
         all_commits = list(repo.iter_commits())
@@ -204,20 +207,19 @@ def peek_at_turn(save_path: Path, turn_number: int) -> dict[str, str]:
     Raises:
         ValueError: If turn_number is out of range
     """
-    ref = _resolve_turn_ref(save_path, turn_number)
     repo = Repo(save_path)
+    history = get_history(save_path)
+    ref = _resolve_turn_ref(repo, history, turn_number)
 
     result: dict[str, str] = {}
 
     # Core state files
-    core_files = ["state.yaml", "conversation.yaml", "summaries.yaml"]
-    for filepath in core_files:
+    for filepath in _STATE_FILES:
         try:
             content = repo.git.show(f"{ref}:{filepath}")
             result[filepath] = content
-        except Exception:
-            # File may not exist at that commit
-            pass
+        except GitCommandError:
+            pass  # File may not exist at that commit
 
     # Memory files: discover via ls-tree
     try:
@@ -227,9 +229,9 @@ def peek_at_turn(save_path: Path, turn_number: int) -> dict[str, str]:
                 try:
                     content = repo.git.show(f"{ref}:{line}")
                     result[line] = content
-                except Exception:
+                except GitCommandError:
                     pass
-    except Exception:
+    except GitCommandError:
         pass
 
     return result
@@ -247,9 +249,9 @@ def diff_turns(save_path: Path, turn_a: int, turn_b: int) -> str:
     Raises:
         ValueError: If either turn is out of range
     """
-    ref_a = _resolve_turn_ref(save_path, turn_a)
-    ref_b = _resolve_turn_ref(save_path, turn_b)
     repo = Repo(save_path)
+    history = get_history(save_path)
+    ref_a = _resolve_turn_ref(repo, history, turn_a)
+    ref_b = _resolve_turn_ref(repo, history, turn_b)
 
-    diff_paths = ["state.yaml", "conversation.yaml", "summaries.yaml", "memory/"]
-    return repo.git.diff(ref_a, ref_b, "--", *diff_paths)
+    return repo.git.diff(ref_a, ref_b, "--", *_STATE_FILES, "memory/")
