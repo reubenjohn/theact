@@ -81,17 +81,17 @@ summary: |
   Updated 3-5 sentence summary of what {name} has experienced.
   This replaces the old summary entirely.
 key_facts:
-  - "Current location or situation"
-  - "Important item or resource"
-  - "Key relationship or opinion"
+  - "Has a flare gun (found in wreckage)"
+  - "Distrusts Joaquin — he seems too calm"
+  - "The compass spins near the stone ruins"
 ```
 
 RULES:
-- summary = narrative history (what happened, past tense).
-- key_facts = current state snapshot. What {name} has, knows, or wants RIGHT NOW.
-- Do NOT repeat information already in the summary as a fact.
+- summary = story so far (what happened, past tense).
+- key_facts = things NOT in the summary: inventory, opinions, clues, suspicions.
+- If a fact is already covered by the summary, leave it out.
 - Drop stale facts. Only keep what matters for {name}'s next response.
-- Write the complete fact list every time. 5-7 facts max."""
+- Write the complete fact list every time. 5 facts max."""
 
 # ─── GAME STATE CHECK ───────────────────────────────────────────────────
 
@@ -136,4 +136,4 @@ Write in past tense. Be specific."""
 
 
 # Maximum number of key facts per character memory.
-MAX_KEY_FACTS = 7
+MAX_KEY_FACTS = 5

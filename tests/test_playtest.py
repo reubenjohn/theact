@@ -580,7 +580,7 @@ class TestIssueDetection:
                     character="Maya",
                     old_summary="",
                     new_summary="New summary",
-                    new_facts=[f"Fact {i}" for i in range(7)],
+                    new_facts=[f"Fact {i}" for i in range(5)],
                 )
             ],
         )
@@ -617,7 +617,7 @@ class TestIssueDetection:
                     character="Maya",
                     old_summary="",
                     new_summary="New summary",
-                    new_facts=[f"Fact {i}" for i in range(5)],
+                    new_facts=[f"Fact {i}" for i in range(3)],
                 )
             ],
         )

@@ -11,6 +11,7 @@
       "mcp__playwright__browser_wait_for",
       "mcp__playwright__browser_snapshot",
       "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_evaluate",
       "Bash(prek src/theact/commands/ src/theact/cli/commands.py tests/test_command_logic.py)",
       "Bash(prek --refresh:*)",
       "Bash(prek --refresh)",
@@ -25,7 +26,11 @@
       "Bash(sort:*)",
       "Bash(uv lock:*)",
       "Bash(uvx ruff@0.11.4:*)",
-      "Bash(uv build:*)"
+      "Bash(uv build:*)",
+      "Bash(tee:*)",
+      "Bash(git worktree:*)",
+      "mcp__playwright__browser_resize",
+      "mcp__playwright__browser_fill_form"
     ]
   }
 }
