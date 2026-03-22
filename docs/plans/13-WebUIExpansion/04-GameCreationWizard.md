@@ -933,10 +933,11 @@ class TestConfigError:
 ## 11. What This Step Does NOT Do
 
 - **No new LLM prompts or agents.** Every LLM call goes through existing creator modules. The wizard is purely a UI wrapper.
-- **No changes to `src/theact/creator/`.** The creator modules are used as-is. The one exception is potentially making `_revise_targeted` public (a rename, not a logic change).
+- **Session helpers made public.** `proposal_from_data`, `char_info_from_data`, `chap_info_from_data`, and `next_chapter_id` in `session.py` were renamed from private (`_`-prefixed) to public for reuse by the web wizard's per-file revision feature.
 - **No in-browser YAML editing.** The review step shows YAML as read-only code blocks. Direct editing of game files is out of scope.
 - **No streaming of LLM responses.** The creator calls return complete responses (not streamed). Progress is shown at the call level ("Generating world...", "Generating character: Maya..."), not at the token level.
-- **No brainstorm mode.** The terminal CLI has a brainstorm tool (`scripts/brainstorm.py`) for freeform ideation. Bringing this to the web is a future enhancement.
+- **Brainstorm chat panel.** ~~The terminal CLI has a brainstorm tool — bringing this to the web was a future enhancement.~~ Now implemented as a right-drawer `CreatorChatPanel` (`src/theact/web/creator_chat.py`) that reuses the brainstorm prompts from `src/theact/creator/prompts.py`. The panel supports conversation summarization and paste-to-concept integration.
+- **Per-file revise buttons.** Each generated file panel in Step 4 has a dedicated feedback input and "Revise" button that calls the appropriate generator directly (bypassing the classifier LLM call), preventing regression of untouched files.
 - **No settings editing.** If the creator model is misconfigured, the wizard tells the user to edit `.env`. In-UI settings editing is Step 05.
 - **No auto-save of wizard state.** If the user navigates away mid-wizard, all progress is lost. Session persistence for the wizard is a Step 08 concern.
 - **No changes to the terminal CLI.** `scripts/create_game.py` continues to work independently.
@@ -953,9 +954,10 @@ After implementation, confirm:
 6. **Accept & Generate** -- Clicking "Accept & Generate" advances to Step 3 and triggers the generation pipeline.
 7. **Generation progress** -- Per-file progress messages appear ("Generating world...", "Generating character: Maya...", etc.). Each message turns green on completion.
 8. **Validation display** -- After generation, validation results appear. If errors exist, auto-fix is attempted and results are shown. Size warnings display in orange.
-9. **File review** -- Step 4 shows all generated YAML files in collapsible, syntax-highlighted code blocks.
-10. **Feedback loop** -- Entering feedback and clicking "Regenerate" revises the targeted files, re-validates, and updates the display.
-11. **Create Game** -- Clicking "Create Game" writes files to `games/<id>/`. A success notification appears and the user is navigated back to the menu. The new game appears in the "New Game" dropdown.
+9. **File review** -- Step 4 shows all generated YAML files in collapsible, syntax-highlighted code blocks. Each file panel has a per-file feedback input and "Revise" button.
+10. **Feedback loop** -- The global "Regenerate" button revises via classifier. Per-file "Revise" buttons call generators directly for the targeted file only, preventing regression of other files.
+11. **Brainstorm panel** -- "Brainstorm" button in the header opens a right-drawer chat panel. Messages are sent to the LLM. The paste button summarizes the conversation and injects it into the concept textarea. The close button hides the drawer.
+12. **Create Game** -- Clicking "Create Game" writes files to `games/<id>/`. A success notification appears and the user is navigated back to the menu. The new game appears in the "New Game" dropdown.
 12. **Overwrite dialog** -- If a game with the same ID exists, a confirmation dialog appears before overwriting.
 13. **Error recovery** -- LLM API errors show an error message and a "Retry" button. Missing creator config shows a helpful message with setup instructions.
 14. **Small model warning** -- If the creator resolves to the 7B gameplay model, a visible warning banner appears at the top of the wizard.

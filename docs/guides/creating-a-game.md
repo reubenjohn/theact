@@ -96,6 +96,22 @@ Bloated game files degrade model performance. See [Data Model — Size Constrain
 
 ## Using the Creator Agent
 
+### Web UI (recommended)
+
+Launch the web UI and click **Create Game** on the menu, or navigate to `/create`:
+
+```bash
+uv run python -m theact.web
+```
+
+The wizard has four steps: Concept, Proposal Review, Generation, and Review & Finalize.
+
+- **Brainstorm panel** — click the "Brainstorm" button in the header to open a side chat for freeform ideation. Click paste to summarize the conversation into the concept field.
+- **Per-file revise** — in the final review step, each generated file has its own feedback input and "Revise" button, allowing you to refine individual files without affecting others.
+- **Global revise** — the "Regenerate" button applies feedback across all files (uses a classifier to target relevant files).
+
+### Terminal CLI
+
 ```bash
 uv run python scripts/create_game.py
 ```

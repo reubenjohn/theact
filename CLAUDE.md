@@ -34,7 +34,7 @@ Code layout:
 - `src/theact/commands/` — Shared command logic (pure functions, no UI imports) used by both CLI and web
 - `src/theact/playtest/` — Autonomous playtest framework with quality scoring
 - `src/theact/creator/` — Game creation agent
-- `src/theact/web/` — NiceGUI web interface (modular: `state.py`, `turn_runner.py`, `streaming.py`, `command_router.py`, `components/`, plus feature modules for toolbar, sidebar, history, creator wizard, settings, playtest dashboard, diagnostics viewer, and safety)
+- `src/theact/web/` — NiceGUI web interface (modular: `state.py`, `turn_runner.py`, `streaming.py`, `command_router.py`, `components/`, plus feature modules for toolbar, sidebar, history, creator wizard, creator chat panel, settings, playtest dashboard, diagnostics viewer, and safety)
 
 ## Documentation
 
