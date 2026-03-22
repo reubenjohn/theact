@@ -1,38 +1,18 @@
 """Tests for decomposed proposal generation."""
 
 from __future__ import annotations
-from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 import yaml
+
+from tests.conftest import creator_config, make_mock_client
 from theact.creator.concept_hints import ConceptHints
-from theact.creator.config import CreatorLLMConfig
 from theact.creator.proposer import (
     assemble_proposal,
     generate_setting,
     generate_characters_proposal,
     generate_chapters_proposal,
 )
-
-
-def _make_mock_client(responses: list[str]) -> AsyncMock:
-    client = AsyncMock()
-    call_count = 0
-
-    async def fake_create(**kwargs):
-        nonlocal call_count
-        idx = min(call_count, len(responses) - 1)
-        call_count += 1
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = responses[idx]
-        return mock_response
-
-    client.chat.completions.create = fake_create
-    return client
-
-
-def _config() -> CreatorLLMConfig:
-    return CreatorLLMConfig(api_key="test-key", model="test-model")
 
 
 @pytest.mark.asyncio
@@ -46,8 +26,8 @@ class TestGenerateSetting:
             "rules": "No magic.",
         }
         response = f"```yaml\n{yaml.dump(setting)}```"
-        client = _make_mock_client([response])
-        result = await generate_setting("A dark forest game", client, _config())
+        client = make_mock_client([response])
+        result = await generate_setting("A dark forest game", client, creator_config())
         assert result["title"] == "Dark Forest"
         assert result["id"] == "dark-forest"
 
@@ -62,8 +42,8 @@ class TestGenerateCharactersProposal:
         }
         response = f"```yaml\n{yaml.dump(chars)}```"
         setting = {"title": "Test", "setting": "Forest.", "tone": "2p."}
-        client = _make_mock_client([response])
-        result = await generate_characters_proposal(setting, client, _config())
+        client = make_mock_client([response])
+        result = await generate_characters_proposal(setting, client, creator_config())
         assert "characters" in result
         assert len(result["characters"]) == 1
 
@@ -79,8 +59,10 @@ class TestGenerateChaptersProposal:
         response = f"```yaml\n{yaml.dump(chaps)}```"
         setting = {"title": "Test", "setting": "Forest."}
         chars = {"characters": [{"stem": "maya", "name": "Maya", "role": "Guide"}]}
-        client = _make_mock_client([response])
-        result = await generate_chapters_proposal(setting, chars, client, _config())
+        client = make_mock_client([response])
+        result = await generate_chapters_proposal(
+            setting, chars, client, creator_config()
+        )
         assert "chapters" in result
 
 
@@ -96,7 +78,7 @@ class TestCharactersProposalWithHints:
         }
         response = f"```yaml\n{yaml.dump(chars)}```"
         setting = {"title": "Noir", "setting": "1940s LA.", "tone": "Dark."}
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
         hints = ConceptHints(
             character_count=2,
             character_names=["Dolores", "Kowalski"],
@@ -105,7 +87,7 @@ class TestCharactersProposalWithHints:
         result = await generate_characters_proposal(
             setting,
             client,
-            _config(),
+            creator_config(),
             concept="A noir mystery with 2 characters named Dolores and Kowalski",
             hints=hints,
         )
@@ -116,8 +98,8 @@ class TestCharactersProposalWithHints:
         chars = {"characters": [{"stem": "maya", "name": "Maya", "role": "Guide"}]}
         response = f"```yaml\n{yaml.dump(chars)}```"
         setting = {"title": "Test", "setting": "Forest.", "tone": "2p."}
-        client = _make_mock_client([response])
-        result = await generate_characters_proposal(setting, client, _config())
+        client = make_mock_client([response])
+        result = await generate_characters_proposal(setting, client, creator_config())
         assert "characters" in result
 
 
@@ -134,13 +116,13 @@ class TestChaptersProposalWithHints:
         response = f"```yaml\n{yaml.dump(chaps)}```"
         setting = {"title": "Adventure", "setting": "Jungle."}
         chars = {"characters": [{"stem": "maya", "name": "Maya", "role": "Guide"}]}
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
         hints = ConceptHints(chapter_count=8)
         result = await generate_chapters_proposal(
             setting,
             chars,
             client,
-            _config(),
+            creator_config(),
             concept="An adventure across 8 chapters",
             hints=hints,
         )
@@ -154,8 +136,10 @@ class TestChaptersProposalWithHints:
         response = f"```yaml\n{yaml.dump(chaps)}```"
         setting = {"title": "Test", "setting": "Forest."}
         chars = {"characters": [{"stem": "maya", "name": "Maya", "role": "Guide"}]}
-        client = _make_mock_client([response])
-        result = await generate_chapters_proposal(setting, chars, client, _config())
+        client = make_mock_client([response])
+        result = await generate_chapters_proposal(
+            setting, chars, client, creator_config()
+        )
         assert "chapters" in result
 
 

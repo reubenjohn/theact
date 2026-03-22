@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 import yaml
 
-from theact.creator.config import CreatorLLMConfig
+from tests.conftest import creator_config, make_mock_client
 from theact.creator.fixer import MAX_FIX_ATTEMPTS, fix_validation_errors
 from theact.creator.validator import validate_game_data
 
@@ -49,28 +47,6 @@ def _valid_game_data() -> dict:
     }
 
 
-def _make_mock_client(responses: list[str]) -> AsyncMock:
-    """Create a mock AsyncOpenAI client that returns canned responses."""
-    client = AsyncMock()
-    call_count = 0
-
-    async def fake_create(**kwargs):
-        nonlocal call_count
-        idx = min(call_count, len(responses) - 1)
-        call_count += 1
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = responses[idx]
-        return mock_response
-
-    client.chat.completions.create = fake_create
-    return client
-
-
-def _config() -> CreatorLLMConfig:
-    return CreatorLLMConfig(api_key="test-key", model="test-model")
-
-
 @pytest.mark.asyncio
 class TestFixValidationErrors:
     async def test_already_valid_no_llm_calls(self):
@@ -78,9 +54,9 @@ class TestFixValidationErrors:
         result = validate_game_data(data)
         assert result.valid
 
-        client = _make_mock_client(["should not be called"])
+        client = make_mock_client(["should not be called"])
         fixed_data, fixed_result = await fix_validation_errors(
-            data, result, client, _config()
+            data, result, client, creator_config()
         )
         assert fixed_result.valid
 
@@ -101,9 +77,9 @@ class TestFixValidationErrors:
         fixed_yaml = yaml.dump(fixed_world, default_flow_style=False, sort_keys=False)
         response = f"```yaml\n{fixed_yaml}```"
 
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
         fixed_data, fixed_result = await fix_validation_errors(
-            data, result, client, _config()
+            data, result, client, creator_config()
         )
         assert fixed_result.valid
 
@@ -119,9 +95,9 @@ class TestFixValidationErrors:
         broken_yaml = yaml.dump(broken_world, default_flow_style=False, sort_keys=False)
         response = f"```yaml\n{broken_yaml}```"
 
-        client = _make_mock_client([response] * MAX_FIX_ATTEMPTS)
+        client = make_mock_client([response] * MAX_FIX_ATTEMPTS)
         _fixed_data, fixed_result = await fix_validation_errors(
-            data, result, client, _config()
+            data, result, client, creator_config()
         )
         assert not fixed_result.valid
 
@@ -139,13 +115,13 @@ class TestFixValidationErrors:
         }
         fixed_yaml = yaml.dump(fixed_world, default_flow_style=False, sort_keys=False)
 
-        client = _make_mock_client(
+        client = make_mock_client(
             [
                 "not valid yaml {{{",
                 f"```yaml\n{fixed_yaml}```",
             ]
         )
         fixed_data, fixed_result = await fix_validation_errors(
-            data, result, client, _config()
+            data, result, client, creator_config()
         )
         assert fixed_result.valid

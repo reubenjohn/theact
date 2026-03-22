@@ -1,32 +1,12 @@
 """Tests for the decomposed generation pipeline."""
 
 from __future__ import annotations
-from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 import yaml
-from theact.creator.config import CreatorLLMConfig
+
+from tests.conftest import creator_config, make_mock_client
 from theact.creator.pipeline import run_generation_pipeline
-
-
-def _make_mock_client(responses: list[str]) -> AsyncMock:
-    client = AsyncMock()
-    call_count = 0
-
-    async def fake_create(**kwargs):
-        nonlocal call_count
-        idx = min(call_count, len(responses) - 1)
-        call_count += 1
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = responses[idx]
-        return mock_response
-
-    client.chat.completions.create = fake_create
-    return client
-
-
-def _config() -> CreatorLLMConfig:
-    return CreatorLLMConfig(api_key="test-key", model="test-model")
 
 
 def _sample_proposal() -> dict:
@@ -82,14 +62,16 @@ CHAPTER_RESPONSE = yaml.dump(
 @pytest.mark.asyncio
 class TestRunGenerationPipeline:
     async def test_produces_complete_game_data(self):
-        client = _make_mock_client(
+        client = make_mock_client(
             [
                 f"```yaml\n{WORLD_RESPONSE}```",
                 f"```yaml\n{CHARACTER_RESPONSE}```",
                 f"```yaml\n{CHAPTER_RESPONSE}```",
             ]
         )
-        result = await run_generation_pipeline(_sample_proposal(), client, _config())
+        result = await run_generation_pipeline(
+            _sample_proposal(), client, creator_config()
+        )
         assert "game" in result
         assert "world" in result
         assert "characters" in result
@@ -99,7 +81,7 @@ class TestRunGenerationPipeline:
         assert "01-start" in result["chapters"]
 
     async def test_progress_callback_invoked(self):
-        client = _make_mock_client(
+        client = make_mock_client(
             [
                 f"```yaml\n{WORLD_RESPONSE}```",
                 f"```yaml\n{CHARACTER_RESPONSE}```",
@@ -110,7 +92,7 @@ class TestRunGenerationPipeline:
         await run_generation_pipeline(
             _sample_proposal(),
             client,
-            _config(),
+            creator_config(),
             on_progress=lambda msg: progress_messages.append(msg),
         )
         assert any("world" in m.lower() for m in progress_messages)
@@ -120,9 +102,9 @@ class TestRunGenerationPipeline:
     async def test_raises_on_empty_characters(self):
         proposal = _sample_proposal()
         proposal["characters"] = []
-        client = _make_mock_client([])
+        client = make_mock_client([])
         with pytest.raises(ValueError, match="no characters"):
-            await run_generation_pipeline(proposal, client, _config())
+            await run_generation_pipeline(proposal, client, creator_config())
 
     async def test_enforces_consistency(self):
         """Pipeline runs enforce_consistency after assembly."""
@@ -138,13 +120,15 @@ class TestRunGenerationPipeline:
             default_flow_style=False,
         )
 
-        client = _make_mock_client(
+        client = make_mock_client(
             [
                 f"```yaml\n{WORLD_RESPONSE}```",
                 f"```yaml\n{char_with_self}```",
                 f"```yaml\n{CHAPTER_RESPONSE}```",
             ]
         )
-        result = await run_generation_pipeline(_sample_proposal(), client, _config())
+        result = await run_generation_pipeline(
+            _sample_proposal(), client, creator_config()
+        )
         # Self-reference should be removed by enforce_consistency
         assert "maya" not in result["characters"]["maya"]["relationships"]

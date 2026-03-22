@@ -2,8 +2,11 @@
 
 import shutil
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
+from theact.creator.config import CreatorLLMConfig
 
 # Path to the example game definition included in the repo
 GAMES_DIR = Path(__file__).parent.parent / "games"
@@ -105,3 +108,28 @@ def saves_dir(tmp_path: Path) -> Path:
     d = tmp_path / "saves"
     d.mkdir()
     return d
+
+
+def make_mock_client(responses: list[str]) -> AsyncMock:
+    """Create an AsyncOpenAI mock that returns canned responses in sequence."""
+    client = AsyncMock()
+    call_count = 0
+
+    async def fake_create(**kwargs):
+        nonlocal call_count
+        idx = min(call_count, len(responses) - 1)
+        call_count += 1
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = responses[idx]
+        return mock_response
+
+    client.chat.completions.create = fake_create
+    return client
+
+
+def creator_config(**overrides) -> CreatorLLMConfig:
+    """Create a CreatorLLMConfig for testing with sensible defaults."""
+    defaults = {"api_key": "test-key", "model": "test-model"}
+    defaults.update(overrides)
+    return CreatorLLMConfig(**defaults)

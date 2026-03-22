@@ -6,37 +6,13 @@ keys, and retry loop on parse failure.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 import yaml
 
+from tests.conftest import creator_config, make_mock_client
 from theact.creator.chapter_gen import generate_chapter
 from theact.creator.character_gen import generate_character
-from theact.creator.config import CreatorLLMConfig
 from theact.creator.generator import YAMLParseError
-
-
-def _make_mock_client(responses: list[str]) -> AsyncMock:
-    """Create a mock AsyncOpenAI client that returns canned responses."""
-    client = AsyncMock()
-    call_count = 0
-
-    async def fake_create(**kwargs):
-        nonlocal call_count
-        idx = min(call_count, len(responses) - 1)
-        call_count += 1
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = responses[idx]
-        return mock_response
-
-    client.chat.completions.create = fake_create
-    return client
-
-
-def _config() -> CreatorLLMConfig:
-    return CreatorLLMConfig(api_key="test-key", model="test-model")
 
 
 def _proposal() -> dict:
@@ -66,7 +42,7 @@ class TestCharacterGenWithPriorContext:
             "relationships": {"maya": "Depends on her."},
         }
         response = f"```yaml\n{yaml.dump(char)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
         prior = {
             "maya": {
                 "name": "Maya",
@@ -82,7 +58,7 @@ class TestCharacterGenWithPriorContext:
             ["maya", "jake"],
             prior,
             client,
-            _config(),
+            creator_config(),
         )
         assert result["name"] == "Jake"
         assert "maya" in result["relationships"]
@@ -97,7 +73,7 @@ class TestCharacterGenWithPriorContext:
             "relationships": {"maya": "Colleague.", "jake": "Friend."},
         }
         response = f"```yaml\n{yaml.dump(char)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
         prior = {
             "maya": {"name": "Maya", "role": "Guide"},
             "jake": {"name": "Jake", "role": "Survivor"},
@@ -108,7 +84,7 @@ class TestCharacterGenWithPriorContext:
             ["maya", "jake", "zara"],
             prior,
             client,
-            _config(),
+            creator_config(),
         )
         assert result["name"] == "Zara"
 
@@ -125,14 +101,14 @@ class TestCharacterGenWithFeedback:
             "relationships": {},
         }
         response = f"```yaml\n{yaml.dump(char)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
         result = await generate_character(
             _proposal(),
             {"stem": "maya", "name": "Maya", "role": "Guide"},
             ["maya"],
             {},
             client,
-            _config(),
+            creator_config(),
             feedback="Make her more adventurous",
         )
         assert result["name"] == "Maya"
@@ -155,14 +131,14 @@ class TestCharacterGenMissingKeys:
         }
         good_response = f"```yaml\n{yaml.dump(complete)}```"
 
-        client = _make_mock_client([incomplete_response, good_response])
+        client = make_mock_client([incomplete_response, good_response])
         result = await generate_character(
             _proposal(),
             {"stem": "maya", "name": "Maya", "role": "Guide"},
             ["maya"],
             {},
             client,
-            _config(),
+            creator_config(),
         )
         assert result["name"] == "Maya"
         assert "role" in result
@@ -173,7 +149,7 @@ class TestCharacterGenMissingKeys:
         """When required keys are missing after all retries, raises."""
         incomplete = {"name": "Maya"}  # missing role, personality, secret
         response = f"```yaml\n{yaml.dump(incomplete)}```"
-        client = _make_mock_client([response, response])
+        client = make_mock_client([response, response])
         with pytest.raises(YAMLParseError, match="missing required keys"):
             await generate_character(
                 _proposal(),
@@ -181,7 +157,7 @@ class TestCharacterGenMissingKeys:
                 ["maya"],
                 {},
                 client,
-                _config(),
+                creator_config(),
             )
 
 
@@ -197,20 +173,20 @@ class TestCharacterGenRetryOnParseFailure:
             "relationships": {},
         }
         good_response = f"```yaml\n{yaml.dump(good_char)}```"
-        client = _make_mock_client(["not valid yaml {{{", good_response])
+        client = make_mock_client(["not valid yaml {{{", good_response])
         result = await generate_character(
             _proposal(),
             {"stem": "maya", "name": "Maya", "role": "Guide"},
             ["maya"],
             {},
             client,
-            _config(),
+            creator_config(),
         )
         assert result["name"] == "Maya"
 
     async def test_raises_after_all_parse_failures(self):
         """All attempts return bad YAML -> raises YAMLParseError."""
-        client = _make_mock_client(["bad {{{", "still bad {{{"])
+        client = make_mock_client(["bad {{{", "still bad {{{"])
         with pytest.raises(YAMLParseError):
             await generate_character(
                 _proposal(),
@@ -218,7 +194,7 @@ class TestCharacterGenRetryOnParseFailure:
                 ["maya"],
                 {},
                 client,
-                _config(),
+                creator_config(),
             )
 
 
@@ -241,7 +217,7 @@ class TestChapterGenWithPriorContext:
             "next": "03-end",
         }
         response = f"```yaml\n{yaml.dump(chap)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
         prior = {
             "01-start": {
                 "id": "01-start",
@@ -256,7 +232,7 @@ class TestChapterGenWithPriorContext:
             prior,
             "03-end",
             client,
-            _config(),
+            creator_config(),
         )
         assert result["id"] == "02-middle"
         assert result["next"] == "03-end"
@@ -273,7 +249,7 @@ class TestChapterGenWithPriorContext:
             "next": None,
         }
         response = f"```yaml\n{yaml.dump(chap)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
         prior = {
             "01-start": {"title": "The Start", "summary": "Begin."},
             "02-middle": {"title": "The Middle", "summary": "Continue."},
@@ -285,7 +261,7 @@ class TestChapterGenWithPriorContext:
             prior,
             None,
             client,
-            _config(),
+            creator_config(),
         )
         assert result["next"] is None
 
@@ -304,7 +280,7 @@ class TestChapterGenWithFeedback:
             "next": None,
         }
         response = f"```yaml\n{yaml.dump(chap)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
         result = await generate_chapter(
             _proposal(),
             {"id": "01-start", "title": "The Start", "summary": "Begin."},
@@ -312,7 +288,7 @@ class TestChapterGenWithFeedback:
             {},
             None,
             client,
-            _config(),
+            creator_config(),
             feedback="Make the start more dramatic",
         )
         assert result["id"] == "01-start"
@@ -339,7 +315,7 @@ class TestChapterGenMissingKeys:
         }
         good_response = f"```yaml\n{yaml.dump(complete)}```"
 
-        client = _make_mock_client([incomplete_response, good_response])
+        client = make_mock_client([incomplete_response, good_response])
         result = await generate_chapter(
             _proposal(),
             {"id": "01-start", "title": "The Start", "summary": "Begin."},
@@ -347,7 +323,7 @@ class TestChapterGenMissingKeys:
             {},
             None,
             client,
-            _config(),
+            creator_config(),
         )
         assert result["id"] == "01-start"
         assert "beats" in result
@@ -356,7 +332,7 @@ class TestChapterGenMissingKeys:
         """When required keys are missing after all retries, raises."""
         incomplete = {"id": "01-start"}  # missing title, summary, beats, completion
         response = f"```yaml\n{yaml.dump(incomplete)}```"
-        client = _make_mock_client([response, response])
+        client = make_mock_client([response, response])
         with pytest.raises(YAMLParseError, match="missing required keys"):
             await generate_chapter(
                 _proposal(),
@@ -365,7 +341,7 @@ class TestChapterGenMissingKeys:
                 {},
                 None,
                 client,
-                _config(),
+                creator_config(),
             )
 
     async def test_missing_characters_key_gets_default(self):
@@ -380,7 +356,7 @@ class TestChapterGenMissingKeys:
             "next": None,
         }
         response = f"```yaml\n{yaml.dump(chap)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
         result = await generate_chapter(
             _proposal(),
             {"id": "01-start", "title": "Start", "summary": "Begin."},
@@ -388,7 +364,7 @@ class TestChapterGenMissingKeys:
             {},
             None,
             client,
-            _config(),
+            creator_config(),
         )
         assert set(result["characters"]) == {"maya", "jake"}
 
@@ -407,7 +383,7 @@ class TestChapterGenRetryOnParseFailure:
             "next": None,
         }
         good_response = f"```yaml\n{yaml.dump(good_chap)}```"
-        client = _make_mock_client(["bad yaml {{{", good_response])
+        client = make_mock_client(["bad yaml {{{", good_response])
         result = await generate_chapter(
             _proposal(),
             {"id": "01-start", "title": "Start", "summary": "Begin."},
@@ -415,13 +391,13 @@ class TestChapterGenRetryOnParseFailure:
             {},
             None,
             client,
-            _config(),
+            creator_config(),
         )
         assert result["id"] == "01-start"
 
     async def test_raises_after_all_parse_failures(self):
         """All attempts return bad YAML -> raises YAMLParseError."""
-        client = _make_mock_client(["bad {{{", "still bad {{{"])
+        client = make_mock_client(["bad {{{", "still bad {{{"])
         with pytest.raises(YAMLParseError):
             await generate_chapter(
                 _proposal(),
@@ -430,5 +406,5 @@ class TestChapterGenRetryOnParseFailure:
                 {},
                 None,
                 client,
-                _config(),
+                creator_config(),
             )

@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 import yaml
 
-from theact.creator.config import CreatorLLMConfig
+from tests.conftest import creator_config, make_mock_client
 from theact.creator.generator import YAMLParseError
 from theact.creator.proposer import (
     generate_proposal,
@@ -16,28 +14,6 @@ from theact.creator.proposer import (
     revise_proposal,
     revise_setting,
 )
-
-
-def _make_mock_client(responses: list[str]) -> AsyncMock:
-    """Create a mock AsyncOpenAI client that returns canned responses."""
-    client = AsyncMock()
-    call_count = 0
-
-    async def fake_create(**kwargs):
-        nonlocal call_count
-        idx = min(call_count, len(responses) - 1)
-        call_count += 1
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = responses[idx]
-        return mock_response
-
-    client.chat.completions.create = fake_create
-    return client
-
-
-def _config() -> CreatorLLMConfig:
-    return CreatorLLMConfig(api_key="test-key", model="test-model")
 
 
 @pytest.mark.asyncio
@@ -51,7 +27,7 @@ class TestReviseSetting:
             "rules": "Ghosts exist.",
         }
         response = f"```yaml\n{yaml.dump(revised)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
 
         current = {
             "title": "Dark Forest",
@@ -60,7 +36,9 @@ class TestReviseSetting:
             "tone": "Second person.",
             "rules": "No magic.",
         }
-        result = await revise_setting(current, "Make it haunted", client, _config())
+        result = await revise_setting(
+            current, "Make it haunted", client, creator_config()
+        )
         assert result["title"] == "Haunted Forest"
         assert "haunted" in result["setting"].lower()
 
@@ -73,11 +51,11 @@ class TestReviseSetting:
             "rules": "Nature is friendly.",
         }
         response = f"```yaml\n{yaml.dump(revised)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
 
         current = {"title": "Dark Forest", "id": "dark-forest"}
         result = await revise_setting(
-            current, "Make it bright and sunny", client, _config()
+            current, "Make it bright and sunny", client, creator_config()
         )
         assert result["title"] == "Bright Forest"
 
@@ -92,7 +70,7 @@ class TestReviseCharactersProposal:
             ]
         }
         response = f"```yaml\n{yaml.dump(revised)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
 
         current = {
             "characters": [
@@ -105,7 +83,7 @@ class TestReviseCharactersProposal:
             setting,
             "Replace Maya with a warrior and healer",
             client,
-            _config(),
+            creator_config(),
         )
         assert len(result["characters"]) == 2
         assert result["characters"][0]["name"] == "Elena"
@@ -117,12 +95,12 @@ class TestReviseCharactersProposal:
             ]
         }
         response = f"```yaml\n{yaml.dump(revised)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
 
         current = {"characters": [{"stem": "maya", "name": "Maya", "role": "Guide"}]}
         setting = {"title": "Forest", "setting": "Dark woods."}
         result = await revise_characters_proposal(
-            current, setting, "Update Maya's role", client, _config()
+            current, setting, "Update Maya's role", client, creator_config()
         )
         assert result["characters"][0]["role"] == "Updated Guide"
 
@@ -137,7 +115,7 @@ class TestReviseChaptersProposal:
             ]
         }
         response = f"```yaml\n{yaml.dump(revised)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
 
         current = {
             "chapters": [{"id": "01-start", "title": "Start", "summary": "Begin."}]
@@ -145,7 +123,12 @@ class TestReviseChaptersProposal:
         setting = {"title": "Forest", "setting": "Dark woods."}
         characters = {"characters": [{"stem": "maya", "name": "Maya", "role": "Guide"}]}
         result = await revise_chapters_proposal(
-            current, setting, characters, "Split into dawn and dusk", client, _config()
+            current,
+            setting,
+            characters,
+            "Split into dawn and dusk",
+            client,
+            creator_config(),
         )
         assert len(result["chapters"]) == 2
         assert result["chapters"][0]["id"] == "01-dawn"
@@ -155,13 +138,13 @@ class TestReviseChaptersProposal:
             "chapters": [{"id": "01-solo", "title": "Solo", "summary": "Alone."}]
         }
         response = f"```yaml\n{yaml.dump(revised)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
 
         current = {"chapters": [{"id": "01-x", "title": "X", "summary": "X."}]}
         setting = {"title": "Test", "setting": "Test."}
         characters = {"characters": []}
         result = await revise_chapters_proposal(
-            current, setting, characters, "Make it solo", client, _config()
+            current, setting, characters, "Make it solo", client, creator_config()
         )
         assert result["chapters"][0]["title"] == "Solo"
 
@@ -179,16 +162,16 @@ class TestLegacyGenerateProposal:
             "chapters": [{"id": "01-start", "title": "Start", "summary": "Begin."}],
         }
         response = f"```yaml\n{yaml.dump(proposal)}```"
-        client = _make_mock_client([response])
-        result = await generate_proposal("A dark forest game", client, _config())
+        client = make_mock_client([response])
+        result = await generate_proposal("A dark forest game", client, creator_config())
         assert result["title"] == "Dark Forest"
         assert "characters" in result
         assert "chapters" in result
 
     async def test_generate_proposal_raises_on_bad_yaml(self):
-        client = _make_mock_client(["not valid yaml {{{"])
+        client = make_mock_client(["not valid yaml {{{"])
         with pytest.raises(YAMLParseError):
-            await generate_proposal("test concept", client, _config())
+            await generate_proposal("test concept", client, creator_config())
 
 
 @pytest.mark.asyncio
@@ -204,7 +187,7 @@ class TestLegacyReviseProposal:
             "chapters": [{"id": "01-haunt", "title": "Haunt", "summary": "Spooky."}],
         }
         response = f"```yaml\n{yaml.dump(revised)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
 
         current = {
             "title": "Dark Forest",
@@ -213,12 +196,14 @@ class TestLegacyReviseProposal:
             "characters": [{"stem": "maya", "name": "Maya", "role": "Guide"}],
             "chapters": [{"id": "01-start", "title": "Start", "summary": "Begin."}],
         }
-        result = await revise_proposal(current, "Make it haunted", client, _config())
+        result = await revise_proposal(
+            current, "Make it haunted", client, creator_config()
+        )
         assert result["title"] == "Haunted Forest"
         assert result["characters"][0]["name"] == "Ghost"
 
     async def test_revise_proposal_raises_on_bad_yaml(self):
-        client = _make_mock_client(["garbage response"])
+        client = make_mock_client(["garbage response"])
         current = {
             "title": "Test",
             "id": "test",
@@ -226,4 +211,6 @@ class TestLegacyReviseProposal:
             "chapters": [],
         }
         with pytest.raises(YAMLParseError):
-            await revise_proposal(current, "change everything", client, _config())
+            await revise_proposal(
+                current, "change everything", client, creator_config()
+            )

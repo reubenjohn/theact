@@ -10,29 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from theact.creator.config import CreatorLLMConfig
-
-
-def _make_mock_client(responses: list[str]) -> AsyncMock:
-    """Create an AsyncOpenAI mock that returns canned responses."""
-    client = AsyncMock()
-    call_count = 0
-
-    async def fake_create(**kwargs):
-        nonlocal call_count
-        idx = min(call_count, len(responses) - 1)
-        call_count += 1
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = responses[idx]
-        return mock_response
-
-    client.chat.completions.create = fake_create
-    return client
-
-
-def _config() -> CreatorLLMConfig:
-    return CreatorLLMConfig(api_key="test-key", model="test-model")
+from tests.conftest import creator_config, make_mock_client
 
 
 class TestChatPanelTruncation:
@@ -41,7 +19,9 @@ class TestChatPanelTruncation:
     def test_no_truncation_when_under_budget(self):
         from theact.web.creator_chat import CreatorChatPanel
 
-        panel = CreatorChatPanel(client=AsyncMock(), config=_config(), on_use_text=None)
+        panel = CreatorChatPanel(
+            client=AsyncMock(), config=creator_config(), on_use_text=None
+        )
         panel._messages.append({"role": "user", "content": "short"})
         panel._messages.append({"role": "assistant", "content": "reply"})
 
@@ -52,7 +32,9 @@ class TestChatPanelTruncation:
     def test_truncation_keeps_system_and_recent(self):
         from theact.web.creator_chat import CreatorChatPanel
 
-        panel = CreatorChatPanel(client=AsyncMock(), config=_config(), on_use_text=None)
+        panel = CreatorChatPanel(
+            client=AsyncMock(), config=creator_config(), on_use_text=None
+        )
         # Add enough messages to exceed budget
         for i in range(30):
             panel._messages.append({"role": "user", "content": f"message {i} " * 100})
@@ -72,8 +54,10 @@ class TestChatPanelSummarize:
     async def test_summarize_returns_llm_response(self):
         from theact.web.creator_chat import CreatorChatPanel
 
-        client = _make_mock_client(["A noir detective game in rainy LA."])
-        panel = CreatorChatPanel(client=client, config=_config(), on_use_text=None)
+        client = make_mock_client(["A noir detective game in rainy LA."])
+        panel = CreatorChatPanel(
+            client=client, config=creator_config(), on_use_text=None
+        )
         panel._messages.append({"role": "user", "content": "noir game"})
         panel._messages.append({"role": "assistant", "content": "great idea"})
 
@@ -96,7 +80,9 @@ class TestChatPanelSummarize:
 
         client.chat.completions.create = fake_create
 
-        panel = CreatorChatPanel(client=client, config=_config(), on_use_text=None)
+        panel = CreatorChatPanel(
+            client=client, config=creator_config(), on_use_text=None
+        )
         panel._messages.append({"role": "user", "content": "noir game"})
         panel._messages.append({"role": "assistant", "content": "cool idea"})
 
@@ -115,7 +101,9 @@ class TestChatPanelUndoAndClear:
         """Create a panel with one user+assistant exchange."""
         from theact.web.creator_chat import CreatorChatPanel
 
-        panel = CreatorChatPanel(client=AsyncMock(), config=_config(), on_use_text=None)
+        panel = CreatorChatPanel(
+            client=AsyncMock(), config=creator_config(), on_use_text=None
+        )
         panel._messages.append({"role": "user", "content": "hello"})
         panel._messages.append({"role": "assistant", "content": "hi there"})
         # Simulate bubble elements (mocks with .delete())
@@ -135,7 +123,9 @@ class TestChatPanelUndoAndClear:
     def test_undo_removes_only_user_when_no_assistant(self):
         from theact.web.creator_chat import CreatorChatPanel
 
-        panel = CreatorChatPanel(client=AsyncMock(), config=_config(), on_use_text=None)
+        panel = CreatorChatPanel(
+            client=AsyncMock(), config=creator_config(), on_use_text=None
+        )
         panel._messages.append({"role": "user", "content": "hello"})
         panel._bubble_elements.append(MagicMock())
         panel._undo_last()
@@ -145,7 +135,9 @@ class TestChatPanelUndoAndClear:
     def test_undo_noop_on_empty_chat(self):
         from theact.web.creator_chat import CreatorChatPanel
 
-        panel = CreatorChatPanel(client=AsyncMock(), config=_config(), on_use_text=None)
+        panel = CreatorChatPanel(
+            client=AsyncMock(), config=creator_config(), on_use_text=None
+        )
         panel._undo_last()  # should not raise
         assert len(panel._messages) == 1
 
@@ -173,7 +165,9 @@ class TestChatPanelUndoAndClear:
     def test_truncation_keeps_bubbles_in_sync(self):
         from theact.web.creator_chat import CreatorChatPanel
 
-        panel = CreatorChatPanel(client=AsyncMock(), config=_config(), on_use_text=None)
+        panel = CreatorChatPanel(
+            client=AsyncMock(), config=creator_config(), on_use_text=None
+        )
         for i in range(30):
             panel._messages.append({"role": "user", "content": f"msg {i} " * 100})
             panel._messages.append(

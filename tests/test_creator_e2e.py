@@ -1,11 +1,10 @@
 """End-to-end test for game creation: proposal -> generation -> validation -> write."""
 
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from theact.creator.config import CreatorLLMConfig
+from tests.conftest import creator_config, make_mock_client
 from theact.creator.generator import generate_game_files
 from theact.creator.proposer import generate_proposal
 from theact.creator.validator import check_size_warnings, validate_game_data
@@ -145,39 +144,17 @@ chapters:
 """
 
 
-def _make_mock_client(responses: list[str]) -> AsyncMock:
-    """Create a mock AsyncOpenAI client that returns canned responses in order."""
-    client = AsyncMock()
-    call_idx = 0
-
-    async def fake_create(**kwargs):
-        nonlocal call_idx
-        idx = min(call_idx, len(responses) - 1)
-        call_idx += 1
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = responses[idx]
-        return mock_response
-
-    client.chat.completions.create = fake_create
-    return client
-
-
-def _config() -> CreatorLLMConfig:
-    return CreatorLLMConfig(api_key="test-key", model="test-model")
-
-
 @pytest.mark.asyncio
 class TestEndToEnd:
     async def test_full_creation_flow(self, tmp_path: Path):
         """Test: concept -> proposal -> generation -> validation -> write."""
-        client = _make_mock_client(
+        client = make_mock_client(
             [
                 f"```yaml\n{CANNED_PROPOSAL}```",
                 f"```yaml\n{CANNED_GENERATION}```",
             ]
         )
-        config = _config()
+        config = creator_config()
 
         # Step 1: Generate proposal
         proposal = await generate_proposal(
@@ -239,13 +216,13 @@ class TestEndToEnd:
 
     async def test_generated_files_within_size_limits(self, tmp_path: Path):
         """Verify the canned output meets size constraints."""
-        client = _make_mock_client(
+        client = make_mock_client(
             [
                 f"```yaml\n{CANNED_PROPOSAL}```",
                 f"```yaml\n{CANNED_GENERATION}```",
             ]
         )
-        config = _config()
+        config = creator_config()
 
         proposal = await generate_proposal("test", client, config)
         data = await generate_game_files(proposal, client, config)

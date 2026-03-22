@@ -4,12 +4,10 @@ and game.yaml error skipping.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 import yaml
 
-from theact.creator.config import CreatorLLMConfig
+from tests.conftest import creator_config, make_mock_client
 from theact.creator.fixer import (
     _group_errors_by_file,
     _parse_file_key,
@@ -18,28 +16,6 @@ from theact.creator.fixer import (
     fix_validation_errors,
 )
 from theact.creator.validator import ValidationError, validate_game_data
-
-
-def _make_mock_client(responses: list[str]) -> AsyncMock:
-    """Create a mock AsyncOpenAI client that returns canned responses."""
-    client = AsyncMock()
-    call_count = 0
-
-    async def fake_create(**kwargs):
-        nonlocal call_count
-        idx = min(call_count, len(responses) - 1)
-        call_count += 1
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = responses[idx]
-        return mock_response
-
-    client.chat.completions.create = fake_create
-    return client
-
-
-def _config() -> CreatorLLMConfig:
-    return CreatorLLMConfig(api_key="test-key", model="test-model")
 
 
 def _valid_game_data() -> dict:
@@ -147,7 +123,7 @@ class TestFixFileFunction:
     async def test_fix_file_returns_fixed_data(self):
         fixed = {"setting": "New setting.", "tone": "2nd person.", "rules": "None."}
         response = f"```yaml\n{yaml.dump(fixed)}```"
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
         errors = [ValidationError("world.yaml", "setting", "Missing setting")]
         result = await fix_file(
             "world",
@@ -156,17 +132,23 @@ class TestFixFileFunction:
             errors,
             {"title": "Test"},
             client,
-            _config(),
+            creator_config(),
         )
         assert result["setting"] == "New setting."
 
     async def test_fix_file_returns_original_on_parse_failure(self):
         """When the LLM returns unparseable YAML, the original data is returned."""
-        client = _make_mock_client(["not valid yaml at all"])
+        client = make_mock_client(["not valid yaml at all"])
         original = {"tone": "2nd person.", "rules": "None."}
         errors = [ValidationError("world.yaml", "setting", "Missing setting")]
         result = await fix_file(
-            "world", "world", original, errors, {"title": "Test"}, client, _config()
+            "world",
+            "world",
+            original,
+            errors,
+            {"title": "Test"},
+            client,
+            creator_config(),
         )
         assert result == original
 
@@ -191,9 +173,9 @@ class TestFixCharacterErrors:
         fixed_yaml = yaml.dump(fixed_char, default_flow_style=False, sort_keys=False)
         response = f"```yaml\n{fixed_yaml}```"
 
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
         fixed_data, fixed_result = await fix_validation_errors(
-            data, result, client, _config()
+            data, result, client, creator_config()
         )
         assert fixed_result.valid
 
@@ -220,9 +202,9 @@ class TestFixChapterErrors:
         fixed_yaml = yaml.dump(fixed_chap, default_flow_style=False, sort_keys=False)
         response = f"```yaml\n{fixed_yaml}```"
 
-        client = _make_mock_client([response])
+        client = make_mock_client([response])
         fixed_data, fixed_result = await fix_validation_errors(
-            data, result, client, _config()
+            data, result, client, creator_config()
         )
         assert fixed_result.valid
 
@@ -240,9 +222,9 @@ class TestFixGameYamlErrorsSkipped:
 
         # The fixer should NOT call the LLM for game.yaml errors.
         # It should reassemble game.yaml from the actual characters/chapters.
-        client = _make_mock_client(["should not be called"])
+        client = make_mock_client(["should not be called"])
         fixed_data, fixed_result = await fix_validation_errors(
-            data, result, client, _config()
+            data, result, client, creator_config()
         )
         # After reassembly, game.yaml should list "maya" (from actual characters)
         assert "maya" in fixed_data["game"]["characters"]
