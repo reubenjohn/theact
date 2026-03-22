@@ -140,6 +140,15 @@ Web UI browser tests require Chromium: `npx -y @playwright/test@latest install c
 - Pre-commit: ruff lint + format via `prek`
 - Tests: pytest with `tmp_path` fixtures for file operations
 
+## Web UI Change Workflow
+
+When modifying the web UI, always manually validate with Playwright MCP:
+
+1. **Start the dev server:** `uv run scripts/dev_server.py restart --port 8111`
+2. **Navigate and inspect** using Playwright MCP tools (`browser_navigate`, `browser_snapshot`, `browser_take_screenshot`)
+3. **Test both static and streaming paths** — static renders from saved conversation history; streaming renders live during a turn. They use different code paths.
+4. **Any visual surprise** discovered during Playwright validation should be captured as a regression test in `tests/` (unit test) or `tests/web/` (browser test) to prevent recurrence.
+
 ## Contributing to CLAUDE.md
 
 This file is checked into the repo and read by all contributors' AI tools. Keep it generic:
