@@ -13,6 +13,8 @@ from openai import AsyncOpenAI
 from theact.creator.config import CreatorLLMConfig
 from theact.creator.generator import (
     YAMLParseError,
+    call_llm,
+    call_llm_with_retry,
     extract_yaml,
     parse_proposal_response,
 )
@@ -39,8 +41,6 @@ from theact.creator.prompts import (
 # Decomposed proposal steps
 # ---------------------------------------------------------------------------
 
-_MAX_ATTEMPTS = 2  # Retry once on YAML parse failure (matches world_gen pattern).
-
 
 async def generate_setting(
     concept: str,
@@ -57,34 +57,14 @@ async def generate_setting(
         {"role": "user", "content": SETTING_USER.format(concept=concept)},
     ]
 
-    last_error: YAMLParseError | None = None
-    for attempt in range(_MAX_ATTEMPTS):
-        response = await client.chat.completions.create(
-            model=config.model,
-            messages=messages,
-            temperature=config.temperature,
-            max_tokens=config.max_tokens_for("proposal"),
-        )
-        response_text = response.choices[0].message.content or ""
-        try:
-            data = extract_yaml(response_text)
-            required = {"title", "id"}
-            missing = required - set(data.keys())
-            if missing:
-                raise YAMLParseError(f"Setting YAML missing required keys: {missing}")
-            return data
-        except YAMLParseError as e:
-            last_error = e
-            if attempt < _MAX_ATTEMPTS - 1:
-                messages.append({"role": "assistant", "content": response_text})
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": f"That was not valid YAML: {e}\nPlease try again.",
-                    }
-                )
-
-    raise last_error  # type: ignore[misc]
+    return await call_llm_with_retry(
+        client,
+        config,
+        messages,
+        call_type="proposal",
+        required_keys={"title", "id"},
+        key_label="Setting YAML",
+    )
 
 
 async def revise_setting(
@@ -108,13 +88,7 @@ async def revise_setting(
         },
     ]
 
-    response = await client.chat.completions.create(
-        model=config.model,
-        messages=messages,
-        temperature=config.temperature,
-        max_tokens=config.max_tokens_for("proposal"),
-    )
-    response_text = response.choices[0].message.content or ""
+    response_text = await call_llm(client, config, messages, call_type="proposal")
     return extract_yaml(response_text)
 
 
@@ -150,32 +124,14 @@ async def generate_characters_proposal(
         {"role": "user", "content": user},
     ]
 
-    last_error: YAMLParseError | None = None
-    for attempt in range(_MAX_ATTEMPTS):
-        response = await client.chat.completions.create(
-            model=config.model,
-            messages=messages,
-            temperature=config.temperature,
-            max_tokens=config.max_tokens_for("proposal"),
-        )
-        response_text = response.choices[0].message.content or ""
-        try:
-            data = extract_yaml(response_text)
-            if "characters" not in data:
-                raise YAMLParseError("Characters YAML missing 'characters' key")
-            return data
-        except YAMLParseError as e:
-            last_error = e
-            if attempt < _MAX_ATTEMPTS - 1:
-                messages.append({"role": "assistant", "content": response_text})
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": f"That was not valid YAML: {e}\nPlease try again.",
-                    }
-                )
-
-    raise last_error  # type: ignore[misc]
+    return await call_llm_with_retry(
+        client,
+        config,
+        messages,
+        call_type="proposal",
+        required_keys={"characters"},
+        key_label="Characters YAML",
+    )
 
 
 async def revise_characters_proposal(
@@ -204,13 +160,7 @@ async def revise_characters_proposal(
         },
     ]
 
-    response = await client.chat.completions.create(
-        model=config.model,
-        messages=messages,
-        temperature=config.temperature,
-        max_tokens=config.max_tokens_for("proposal"),
-    )
-    response_text = response.choices[0].message.content or ""
+    response_text = await call_llm(client, config, messages, call_type="proposal")
     return extract_yaml(response_text)
 
 
@@ -261,8 +211,9 @@ async def generate_chapters_proposal(
     else:
         max_tokens = base_max_tokens
 
+    max_attempts = 2
     last_error: YAMLParseError | None = None
-    for attempt in range(_MAX_ATTEMPTS):
+    for attempt in range(max_attempts):
         response = await client.chat.completions.create(
             model=config.model,
             messages=messages,
@@ -277,7 +228,7 @@ async def generate_chapters_proposal(
             return data
         except YAMLParseError as e:
             last_error = e
-            if attempt < _MAX_ATTEMPTS - 1:
+            if attempt < max_attempts - 1:
                 messages.append({"role": "assistant", "content": response_text})
                 messages.append(
                     {
@@ -322,13 +273,7 @@ async def revise_chapters_proposal(
         },
     ]
 
-    response = await client.chat.completions.create(
-        model=config.model,
-        messages=messages,
-        temperature=config.temperature,
-        max_tokens=config.max_tokens_for("proposal"),
-    )
-    response_text = response.choices[0].message.content or ""
+    response_text = await call_llm(client, config, messages, call_type="proposal")
     return extract_yaml(response_text)
 
 
