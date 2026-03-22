@@ -5,6 +5,9 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.coverage
+coverage.xml
+htmlcov/
 saves/
 playtests/
 diagnostics/
