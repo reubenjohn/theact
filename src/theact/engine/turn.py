@@ -219,6 +219,7 @@ async def run_turn(
 
     character_responses: list[CharacterResponse] = []
     prior_responses: list[CharacterResponse] = []
+    seen_char_ids: set[str] = set()
 
     for raw_char_id in narrator_output.responding_characters:
         char_id = resolve_character_id(raw_char_id, game.characters)
@@ -229,6 +230,9 @@ async def run_turn(
             continue
         if char_id != raw_char_id:
             logger.info("Resolved character id %r → %r", raw_char_id, char_id)
+        if char_id in seen_char_ids:
+            continue
+        seen_char_ids.add(char_id)
 
         char = game.characters[char_id]
         char_memory = game.memories.get(char_id)

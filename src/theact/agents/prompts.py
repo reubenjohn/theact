@@ -42,6 +42,7 @@ OUTPUT RULES:
 - responding_characters uses IDs from ACTIVE CHARACTERS.
 - mood is one of: tense, calm, urgent, mysterious, humorous, dramatic, melancholic.
 - narration must be the last field in the YAML block.
+- Do not write character dialogue — characters respond separately.
 - Never speak for the player. Never decide what the player does next."""
 
 # ─── CHARACTER ───────────────────────────────────────────────────────────
@@ -109,6 +110,7 @@ new_beats:
 
 RULES:
 - Only mark beats that clearly happened this turn.
+- Ignore beats already marked [x] — only report NEW beats.
 - chapter_complete is true ONLY when the completion condition is fully met.
 - new_beats contains the exact text of beats from the chapter definition.
 - If no beats were hit, new_beats is an empty list."""
