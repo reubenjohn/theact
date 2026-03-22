@@ -31,7 +31,7 @@ async def call_llm(
     response = await client.chat.completions.create(
         model=config.model,
         messages=messages,
-        temperature=config.generation_temperature,
+        temperature=config.temperature,
         max_tokens=config.max_tokens_for(call_type) if call_type else config.max_tokens,
     )
     return response.choices[0].message.content or ""

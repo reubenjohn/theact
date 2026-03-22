@@ -112,7 +112,7 @@ There is no code-side slugification — the LLM is prompted to produce a valid s
 | `CREATOR_API_KEY` | `LLM_API_KEY` | (required) |
 | `CREATOR_MODEL` | `LLM_MODEL` | (none) |
 
-A warning is printed if the resolved model is the 7B gameplay model (`olafangensan-glm-4.7-flash-heretic`), since game creation benefits from a larger model's ability to produce consistent, well-structured YAML across multiple files.
+A warning is printed if no model is configured. Game creation benefits from a larger model's ability to produce consistent, well-structured YAML across multiple files. Token budgets and temperature can be tuned in `settings.yaml` or the web Settings panel.
 
 ## See Also
 

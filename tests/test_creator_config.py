@@ -4,7 +4,7 @@ import warnings
 
 import pytest
 
-from theact.creator.config import CreatorLLMConfig, _GAMEPLAY_MODEL, load_creator_config
+from theact.creator.config import CreatorLLMConfig, load_creator_config
 
 
 class TestCreatorLLMConfig:
@@ -34,38 +34,21 @@ class TestCreatorLLMConfig:
         assert config.model == "gpt-4o"
         assert config.temperature == 0.5
 
-    def test_is_small_model_true_for_7b(self):
-        config = CreatorLLMConfig(model=_GAMEPLAY_MODEL)
-        assert config.is_small_model is True
-
-    def test_is_small_model_false_for_large_model(self):
-        config = CreatorLLMConfig(model="gpt-4o")
-        assert config.is_small_model is False
-
-    def test_is_small_model_case_insensitive(self):
-        config = CreatorLLMConfig(model="Some-HERETIC-Model")
-        assert config.is_small_model is True
-
-    def test_max_tokens_for_small_model(self):
-        config = CreatorLLMConfig(model=_GAMEPLAY_MODEL)
-        assert config.max_tokens_for("world") == 800
-        assert config.max_tokens_for("character") == 800
-        assert config.max_tokens_for("chapter") == 1000
-        assert config.max_tokens_for("fix") == 600
+    def test_max_tokens_for_proposal(self):
+        config = CreatorLLMConfig()
         assert config.max_tokens_for("proposal") == 3000
 
-    def test_max_tokens_for_large_model(self):
-        config = CreatorLLMConfig(model="gpt-4o")
+    def test_max_tokens_for_generation(self):
+        config = CreatorLLMConfig()
         assert config.max_tokens_for("world") == 4096
-        assert config.max_tokens_for("proposal") == 3000
+        assert config.max_tokens_for("character") == 4096
+        assert config.max_tokens_for("chapter") == 4096
+        assert config.max_tokens_for("fix") == 4096
 
-    def test_generation_temperature_small_model(self):
-        config = CreatorLLMConfig(model=_GAMEPLAY_MODEL)
-        assert config.generation_temperature == 0.5
-
-    def test_generation_temperature_large_model(self):
-        config = CreatorLLMConfig(model="gpt-4o")
-        assert config.generation_temperature == 0.7
+    def test_max_tokens_for_custom_values(self):
+        config = CreatorLLMConfig(max_tokens=2048, proposal_max_tokens=1500)
+        assert config.max_tokens_for("world") == 2048
+        assert config.max_tokens_for("proposal") == 1500
 
 
 class TestLoadCreatorConfig:
@@ -113,7 +96,7 @@ class TestLoadCreatorConfig:
         assert config.api_key == "creator-key"
         assert config.model == "gpt-4o"
 
-    def test_warns_on_small_model(self, monkeypatch):
+    def test_warns_when_no_model(self, monkeypatch):
         monkeypatch.setenv("LLM_API_KEY", "test-key")
         monkeypatch.delenv("CREATOR_API_KEY", raising=False)
         monkeypatch.delenv("CREATOR_MODEL", raising=False)
@@ -125,10 +108,10 @@ class TestLoadCreatorConfig:
             warnings.simplefilter("always")
             config = load_creator_config()
             assert len(w) == 1
-            assert "7B gameplay model" in str(w[0].message)
-            assert config.is_small_model is True
+            assert "No model configured" in str(w[0].message)
+            assert config.model == ""
 
-    def test_no_warning_for_large_model(self, monkeypatch):
+    def test_no_warning_when_model_set(self, monkeypatch):
         monkeypatch.setenv("CREATOR_API_KEY", "test-key")
         monkeypatch.setenv("CREATOR_MODEL", "gpt-4o")
         monkeypatch.delenv("LLM_API_KEY", raising=False)
@@ -140,4 +123,4 @@ class TestLoadCreatorConfig:
             warnings.simplefilter("always")
             config = load_creator_config()
             assert len(w) == 0
-            assert config.is_small_model is False
+            assert config.model == "gpt-4o"

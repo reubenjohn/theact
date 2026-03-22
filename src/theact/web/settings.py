@@ -237,6 +237,37 @@ def _build_creator_section(settings: SettingsData) -> dict:
             .bind_enabled_from(fields["use_same"], "value", backward=lambda v: not v)
         )
 
+        fields["temperature"] = (
+            ui.number(
+                label="Creator Temperature",
+                value=settings.creator_temperature,
+                min=0.0,
+                max=2.0,
+                step=0.1,
+            )
+            .classes("w-full")
+            .props("outlined dense dark")
+        )
+        ui.label("0.5 for small/thinking models, 0.7 for large models").style(
+            "color: #888; font-size: 0.8em;"
+        )
+
+        fields["max_tokens"] = (
+            ui.number(
+                label="Creator Max Tokens",
+                value=settings.creator_max_tokens,
+                min=512,
+                max=16384,
+                step=512,
+            )
+            .classes("w-full")
+            .props("outlined dense dark")
+        )
+        ui.label(
+            "Max output tokens per generation call. "
+            "Keep generous (4096+) for thinking models."
+        ).style("color: #888; font-size: 0.8em;")
+
     return fields
 
 
@@ -310,6 +341,8 @@ def _collect_form_values(
         creator_api_key=creator_fields["api_key"].value or "",
         creator_base_url=creator_fields["base_url"].value or "",
         creator_model=creator_fields["model"].value or "",
+        creator_temperature=float(creator_fields["temperature"].value),
+        creator_max_tokens=int(creator_fields["max_tokens"].value or 4096),
         default_show_thinking=display_fields["show_thinking"].value,
         font_size=display_fields["font_size"].value or "medium",
         density=display_fields["density"].value or "comfortable",

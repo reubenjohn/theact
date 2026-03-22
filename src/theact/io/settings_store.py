@@ -45,6 +45,8 @@ class SettingsData:
     creator_api_key: str = ""
     creator_base_url: str = "https://api.openai.com/v1"
     creator_model: str = ""
+    creator_temperature: float = 0.7  # 0.5 for small/thinking models
+    creator_max_tokens: int = 4096  # keep generous for thinking models
 
     # Display preferences
     default_show_thinking: bool = False

@@ -14,57 +14,32 @@ class CreatorLLMConfig:
     Uses a separate, more capable model than the gameplay agents.
     Checks CREATOR_* env vars first, then LLM_* env vars.
 
-    IMPORTANT: Small 7B-class models cannot reliably perform game creation.
-    If no CREATOR_MODEL is set and the resolved model is a small default,
-    a warning is printed at session start. The user should set CREATOR_MODEL
-    to a capable model (e.g., gpt-4o, claude-sonnet-4-20250514).
+    All token budgets and temperature are user-configurable via
+    settings.yaml or environment variables — no model-name detection.
+
+    Tuning guide:
+      Large models (gpt-4o, claude-sonnet, etc.):
+        temperature=0.7, max_tokens=4096, proposal_max_tokens=3000
+      Small / thinking models (7B-class):
+        temperature=0.5, max_tokens=4096, proposal_max_tokens=3000
+        (thinking tokens consume the max_tokens budget, so keep it generous)
     """
 
     base_url: str = "https://api.openai.com/v1"
     api_key: str = ""
     model: str = ""
-    temperature: float = 0.7  # moderate creativity for game design
-    max_tokens: int = 4096  # large model default
-    proposal_max_tokens: int = 3000  # generous to accommodate thinking models
-
-    # Small model overrides (applied when is_small_model is True)
-    small_model_world_max_tokens: int = 800
-    small_model_character_max_tokens: int = 800
-    small_model_chapter_max_tokens: int = 1000
-    small_model_fix_max_tokens: int = 600
-    small_model_temperature: float = 0.5
-
-    @property
-    def is_small_model(self) -> bool:
-        """True if the resolved model is the 7B gameplay model.
-        Game creation requires a larger, more capable model.
-        """
-        return "heretic" in self.model.lower()
+    temperature: float = 0.7
+    max_tokens: int = 4096
+    proposal_max_tokens: int = 3000
 
     def max_tokens_for(self, call_type: str) -> int:
         """Return max_tokens for the given call type.
 
         call_type: "world", "character", "chapter", "fix", or "proposal"
         """
-        if not self.is_small_model:
-            return (
-                self.max_tokens if call_type != "proposal" else self.proposal_max_tokens
-            )
-        return {
-            "world": self.small_model_world_max_tokens,
-            "character": self.small_model_character_max_tokens,
-            "chapter": self.small_model_chapter_max_tokens,
-            "fix": self.small_model_fix_max_tokens,
-            "proposal": self.proposal_max_tokens,
-        }.get(call_type, self.small_model_world_max_tokens)
-
-    @property
-    def generation_temperature(self) -> float:
-        return self.small_model_temperature if self.is_small_model else self.temperature
-
-
-# The 7B model used for gameplay -- game creation should NOT use this.
-_GAMEPLAY_MODEL = "olafangensan-glm-4.7-flash-heretic"
+        if call_type == "proposal":
+            return self.proposal_max_tokens
+        return self.max_tokens
 
 
 def load_creator_config() -> CreatorLLMConfig:
@@ -89,7 +64,7 @@ def load_creator_config() -> CreatorLLMConfig:
             # Use primary LLM config values
             api_key = settings.llm_api_key or os.getenv("LLM_API_KEY", "")
             base_url = settings.llm_base_url
-            model = settings.llm_model or os.getenv("LLM_MODEL", _GAMEPLAY_MODEL)
+            model = settings.llm_model or os.getenv("LLM_MODEL", "")
         else:
             # Use creator-specific values
             api_key = (
@@ -105,6 +80,8 @@ def load_creator_config() -> CreatorLLMConfig:
             base_url=base_url,
             api_key=api_key,
             model=model,
+            temperature=settings.creator_temperature,
+            max_tokens=settings.creator_max_tokens,
         )
     else:
         # Original env-var-only path (unchanged)
@@ -119,15 +96,14 @@ def load_creator_config() -> CreatorLLMConfig:
             ),
             model=os.getenv(
                 "CREATOR_MODEL",
-                os.getenv("LLM_MODEL", _GAMEPLAY_MODEL),
+                os.getenv("LLM_MODEL", ""),
             ),
         )
 
-    if config.is_small_model:
+    if not config.model:
         warnings.warn(
-            "No CREATOR_MODEL set — falling back to the 7B gameplay model "
-            f"({config.model}). Game creation works best with a larger model. "
-            "Set CREATOR_MODEL=gpt-4o (or similar) in your .env file.",
+            "No model configured for game creation. "
+            "Set CREATOR_MODEL (or LLM_MODEL) in .env or Settings.",
             stacklevel=2,
         )
 
