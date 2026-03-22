@@ -98,7 +98,7 @@ def _compute_memory_health(logger: PlaytestLogger) -> dict:
                         fact_words
                         and sum(1 for w in fact_words if w in summary_words)
                         / len(fact_words)
-                        > 0.5
+                        > 0.7
                     ):
                         overlap_counts[char] = overlap_counts.get(char, 0) + 1
                         break
