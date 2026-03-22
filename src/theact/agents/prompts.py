@@ -87,7 +87,7 @@ update: []
 RULES:
 - The summary is the most important field. Include all key information.
 - add: new facts only. Short, specific statements. Max 10 total.
-- remove/update: leave empty unless a fact is clearly wrong.
+- remove/update: leave empty unless a fact is clearly wrong or outdated.
 - If nothing meaningful changed, keep the summary and leave add empty."""
 
 # ─── GAME STATE CHECK ───────────────────────────────────────────────────
