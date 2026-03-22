@@ -320,14 +320,7 @@ async def generate_proposal(
         {"role": "user", "content": PROPOSAL_USER.format(concept=concept)},
     ]
 
-    response = await client.chat.completions.create(
-        model=config.model,
-        messages=messages,
-        temperature=config.temperature,
-        max_tokens=config.proposal_max_tokens,
-    )
-    response_text = response.choices[0].message.content or ""
-
+    response_text = await call_llm(client, config, messages, call_type="proposal")
     return parse_proposal_response(response_text)
 
 
@@ -366,12 +359,5 @@ async def revise_proposal(
         },
     ]
 
-    response = await client.chat.completions.create(
-        model=config.model,
-        messages=messages,
-        temperature=config.temperature,
-        max_tokens=config.proposal_max_tokens,
-    )
-    response_text = response.choices[0].message.content or ""
-
+    response_text = await call_llm(client, config, messages, call_type="proposal")
     return parse_proposal_response(response_text)
