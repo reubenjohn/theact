@@ -110,18 +110,18 @@ class TestComputeMemoryHealth:
         assert maya["total_turns"] == 2
 
     def test_at_cap_detection(self):
-        """Facts at MAX_KEY_FACTS (5) should be flagged."""
+        """Facts exceeding MAX_KEY_FACTS should be flagged as overflow."""
         from theact.agents.prompts import MAX_KEY_FACTS
 
         logger = _build_logger_with_memory(
             facts_per_turn=[
-                {"Maya": [f"fact{i}" for i in range(MAX_KEY_FACTS)]},
+                {"Maya": [f"fact{i}" for i in range(MAX_KEY_FACTS + 1)]},
                 {"Maya": [f"fact{i}" for i in range(3)]},
             ]
         )
         health = _compute_memory_health(logger)
         maya = health["per_character"]["Maya"]
-        assert maya["turns_at_cap"] == 1
+        assert maya["turns_overflow"] == 1
 
     def test_stale_facts_detection(self):
         """Identical facts across consecutive turns count as stale."""
@@ -456,7 +456,7 @@ class TestGenerateReportMarkdownExtended:
                     "Maya": {
                         "avg_fact_count": 3.5,
                         "max_fact_count": 5,
-                        "turns_at_cap": 1,
+                        "turns_overflow": 1,
                         "turns_with_overlap": 0,
                         "turns_stale": 2,
                         "total_turns": 4,
@@ -468,7 +468,7 @@ class TestGenerateReportMarkdownExtended:
         md = generate_report_markdown(report)
         assert "## Memory Health" in md
         assert "Maya" in md
-        assert "At Cap" in md
+        assert "Overflow" in md
         assert "Stale" in md
 
     def test_memory_final_with_facts(self):

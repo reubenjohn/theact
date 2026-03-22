@@ -1,5 +1,7 @@
 """Tests for LLM configuration."""
 
+from unittest.mock import patch
+
 import pytest
 
 from theact.llm.config import (
@@ -86,16 +88,28 @@ class TestAgentDefaults:
 
 
 class TestLoadLLMConfig:
+    """Tests for load_llm_config() via env-var path.
+
+    Patches SETTINGS_FILE.exists() to False so tests always use the
+    env-var code path regardless of local settings.yaml presence.
+    """
+
+    _SETTINGS = "theact.io.settings_store.SETTINGS_FILE"
+
     def test_missing_api_key_raises(self, monkeypatch):
         monkeypatch.delenv("LLM_API_KEY", raising=False)
-        with pytest.raises(ValueError, match="LLM_API_KEY"):
-            load_llm_config()
+        with patch(self._SETTINGS) as sf:
+            sf.exists.return_value = False
+            with pytest.raises(ValueError, match="LLM_API_KEY"):
+                load_llm_config()
 
     def test_loads_from_env(self, monkeypatch):
         monkeypatch.setenv("LLM_API_KEY", "test-key-123")
         monkeypatch.delenv("LLM_BASE_URL", raising=False)
         monkeypatch.delenv("LLM_MODEL", raising=False)
-        config = load_llm_config()
+        with patch(self._SETTINGS) as sf:
+            sf.exists.return_value = False
+            config = load_llm_config()
         assert config.api_key == "test-key-123"
         assert config.base_url == "https://api.openai.com/v1"
         assert config.model == ""
@@ -104,7 +118,9 @@ class TestLoadLLMConfig:
         monkeypatch.setenv("LLM_API_KEY", "my-key")
         monkeypatch.setenv("LLM_BASE_URL", "http://localhost:1234")
         monkeypatch.setenv("LLM_MODEL", "custom-model")
-        config = load_llm_config()
+        with patch(self._SETTINGS) as sf:
+            sf.exists.return_value = False
+            config = load_llm_config()
         assert config.api_key == "my-key"
         assert config.base_url == "http://localhost:1234"
         assert config.model == "custom-model"

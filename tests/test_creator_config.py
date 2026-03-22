@@ -1,10 +1,13 @@
 """Tests for creator LLM configuration."""
 
 import warnings
+from unittest.mock import patch
 
 import pytest
 
 from theact.creator.config import CreatorLLMConfig, load_creator_config
+
+_SETTINGS_FILE_PATH = "theact.io.settings_store.SETTINGS_FILE"
 
 
 class TestCreatorLLMConfig:
@@ -52,11 +55,21 @@ class TestCreatorLLMConfig:
 
 
 class TestLoadCreatorConfig:
+    """Tests for load_creator_config() via env-var path.
+
+    All tests patch SETTINGS_FILE.exists() to False so they exercise the
+    env-var-only code path regardless of local settings.yaml presence.
+    """
+
     def test_missing_api_key_raises(self, monkeypatch):
         monkeypatch.delenv("CREATOR_API_KEY", raising=False)
         monkeypatch.delenv("LLM_API_KEY", raising=False)
-        with pytest.raises(ValueError, match="No API key found"):
-            load_creator_config()
+        monkeypatch.delenv("CREATOR_MODEL", raising=False)
+        monkeypatch.delenv("LLM_MODEL", raising=False)
+        with patch(_SETTINGS_FILE_PATH) as mock_file:
+            mock_file.exists.return_value = False
+            with pytest.raises(ValueError, match="No API key found"):
+                load_creator_config()
 
     def test_loads_creator_vars(self, monkeypatch):
         monkeypatch.setenv("CREATOR_API_KEY", "creator-key")
@@ -66,7 +79,9 @@ class TestLoadCreatorConfig:
         monkeypatch.delenv("LLM_BASE_URL", raising=False)
         monkeypatch.delenv("LLM_MODEL", raising=False)
 
-        config = load_creator_config()
+        with patch(_SETTINGS_FILE_PATH) as mock_file:
+            mock_file.exists.return_value = False
+            config = load_creator_config()
         assert config.api_key == "creator-key"
         assert config.base_url == "http://creator-host"
         assert config.model == "gpt-4o"
@@ -79,7 +94,9 @@ class TestLoadCreatorConfig:
         monkeypatch.setenv("LLM_BASE_URL", "http://llm-host")
         monkeypatch.setenv("LLM_MODEL", "gpt-4o")
 
-        config = load_creator_config()
+        with patch(_SETTINGS_FILE_PATH) as mock_file:
+            mock_file.exists.return_value = False
+            config = load_creator_config()
         assert config.api_key == "llm-key"
         assert config.base_url == "http://llm-host"
         assert config.model == "gpt-4o"
@@ -92,7 +109,9 @@ class TestLoadCreatorConfig:
         monkeypatch.delenv("CREATOR_BASE_URL", raising=False)
         monkeypatch.delenv("LLM_BASE_URL", raising=False)
 
-        config = load_creator_config()
+        with patch(_SETTINGS_FILE_PATH) as mock_file:
+            mock_file.exists.return_value = False
+            config = load_creator_config()
         assert config.api_key == "creator-key"
         assert config.model == "gpt-4o"
 
@@ -104,12 +123,14 @@ class TestLoadCreatorConfig:
         monkeypatch.delenv("LLM_MODEL", raising=False)
         monkeypatch.delenv("LLM_BASE_URL", raising=False)
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            config = load_creator_config()
-            assert len(w) == 1
-            assert "No model configured" in str(w[0].message)
-            assert config.model == ""
+        with patch(_SETTINGS_FILE_PATH) as mock_file:
+            mock_file.exists.return_value = False
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                config = load_creator_config()
+                assert len(w) == 1
+                assert "No model configured" in str(w[0].message)
+                assert config.model == ""
 
     def test_no_warning_when_model_set(self, monkeypatch):
         monkeypatch.setenv("CREATOR_API_KEY", "test-key")
@@ -119,8 +140,10 @@ class TestLoadCreatorConfig:
         monkeypatch.delenv("LLM_BASE_URL", raising=False)
         monkeypatch.delenv("LLM_MODEL", raising=False)
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            config = load_creator_config()
-            assert len(w) == 0
-            assert config.model == "gpt-4o"
+        with patch(_SETTINGS_FILE_PATH) as mock_file:
+            mock_file.exists.return_value = False
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                config = load_creator_config()
+                assert len(w) == 0
+                assert config.model == "gpt-4o"
