@@ -35,7 +35,11 @@ def render_static_turn(
     """
     card = create_turn_card(container, turn_number, chapter_title)
 
-    for entry in entries:
+    # Render player entries first (player input triggers the responses)
+    player_entries = [e for e in entries if e.role == "player"]
+    other_entries = [e for e in entries if e.role != "player"]
+
+    for entry in player_entries + other_entries:
         if entry.role == "narrator":
             with card:
                 ui.label("Narrator").style(
