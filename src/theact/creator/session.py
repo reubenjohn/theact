@@ -303,7 +303,7 @@ async def revise_targeted(
         # Fallback: use the old monolithic revision approach
         return await _revise_and_validate(data, feedback, client, config)
 
-    proposal = _proposal_from_data(data)
+    proposal = proposal_from_data(data)
 
     for target in targets:
         if target.file_type == "world":
@@ -314,7 +314,7 @@ async def revise_targeted(
                 feedback=feedback,
             )
         elif target.file_type == "character" and target.stem:
-            char_info = _char_info(data, target.stem)
+            char_info = char_info_from_data(data, target.stem)
             if char_info:
                 data["characters"][target.stem] = await generate_character(
                     proposal=proposal,
@@ -328,7 +328,7 @@ async def revise_targeted(
                     feedback=feedback,
                 )
         elif target.file_type == "chapter" and target.stem:
-            chap_info = _chap_info(data, target.stem)
+            chap_info = chap_info_from_data(data, target.stem)
             if chap_info:
                 data["chapters"][target.stem] = await generate_chapter(
                     proposal=proposal,
@@ -337,7 +337,7 @@ async def revise_targeted(
                     prior_chapters={
                         k: v for k, v in data["chapters"].items() if k != target.stem
                     },
-                    next_chapter_id=_next_chapter_id(data, target.stem),
+                    next_chapter_id=next_chapter_id(data, target.stem),
                     client=client,
                     config=config,
                     feedback=feedback,
@@ -395,7 +395,7 @@ async def _revise_and_validate(
 # ---------------------------------------------------------------------------
 
 
-def _proposal_from_data(data: dict) -> dict:
+def proposal_from_data(data: dict) -> dict:
     """Reconstruct a proposal-like dict from current game data."""
     game = data.get("game", {})
     world = data.get("world", {})
@@ -424,7 +424,7 @@ def _proposal_from_data(data: dict) -> dict:
     }
 
 
-def _char_info(data: dict, stem: str) -> dict | None:
+def char_info_from_data(data: dict, stem: str) -> dict | None:
     """Get char_info dict for a character stem."""
     char_data = data.get("characters", {}).get(stem)
     if not char_data:
@@ -436,7 +436,7 @@ def _char_info(data: dict, stem: str) -> dict | None:
     }
 
 
-def _chap_info(data: dict, cid: str) -> dict | None:
+def chap_info_from_data(data: dict, cid: str) -> dict | None:
     """Get chap_info dict for a chapter id."""
     chap_data = data.get("chapters", {}).get(cid)
     if not chap_data:
@@ -448,7 +448,7 @@ def _chap_info(data: dict, cid: str) -> dict | None:
     }
 
 
-def _next_chapter_id(data: dict, cid: str) -> str | None:
+def next_chapter_id(data: dict, cid: str) -> str | None:
     """Get the next chapter id for a given chapter."""
     chapter_ids = list(data.get("chapters", {}).keys())
     try:

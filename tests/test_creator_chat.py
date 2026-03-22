@@ -1,0 +1,108 @@
+"""Tests for the brainstorm chat panel backend logic.
+
+Tests the CreatorChatPanel's message handling, truncation, and summarization
+without requiring a live NiceGUI server (mocks the UI and LLM).
+"""
+
+from __future__ import annotations
+
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from theact.creator.config import CreatorLLMConfig
+
+
+def _make_mock_client(responses: list[str]) -> AsyncMock:
+    """Create an AsyncOpenAI mock that returns canned responses."""
+    client = AsyncMock()
+    call_count = 0
+
+    async def fake_create(**kwargs):
+        nonlocal call_count
+        idx = min(call_count, len(responses) - 1)
+        call_count += 1
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = responses[idx]
+        return mock_response
+
+    client.chat.completions.create = fake_create
+    return client
+
+
+def _config() -> CreatorLLMConfig:
+    return CreatorLLMConfig(api_key="test-key", model="test-model")
+
+
+class TestChatPanelTruncation:
+    """Test the sliding window truncation logic."""
+
+    def test_no_truncation_when_under_budget(self):
+        from theact.web.creator_chat import CreatorChatPanel
+
+        panel = CreatorChatPanel(client=AsyncMock(), config=_config(), on_use_text=None)
+        panel._messages.append({"role": "user", "content": "short"})
+        panel._messages.append({"role": "assistant", "content": "reply"})
+
+        panel._truncate_if_needed()
+        # System + 2 messages = 3 total
+        assert len(panel._messages) == 3
+
+    def test_truncation_keeps_system_and_recent(self):
+        from theact.web.creator_chat import CreatorChatPanel
+
+        panel = CreatorChatPanel(client=AsyncMock(), config=_config(), on_use_text=None)
+        # Add enough messages to exceed budget
+        for i in range(30):
+            panel._messages.append({"role": "user", "content": f"message {i} " * 100})
+            panel._messages.append(
+                {"role": "assistant", "content": f"reply {i} " * 100}
+            )
+
+        panel._truncate_if_needed()
+        assert panel._messages[0]["role"] == "system"
+        assert len(panel._messages) <= 1 + panel.KEEP_EXCHANGES * 2
+
+
+@pytest.mark.asyncio
+class TestChatPanelSummarize:
+    """Test the conversation summarization logic."""
+
+    async def test_summarize_returns_llm_response(self):
+        from theact.web.creator_chat import CreatorChatPanel
+
+        client = _make_mock_client(["A noir detective game in rainy LA."])
+        panel = CreatorChatPanel(client=client, config=_config(), on_use_text=None)
+        panel._messages.append({"role": "user", "content": "noir game"})
+        panel._messages.append({"role": "assistant", "content": "great idea"})
+
+        summary = await panel._summarize()
+        assert summary == "A noir detective game in rainy LA."
+
+    async def test_summarize_formats_conversation(self):
+        from theact.web.creator_chat import CreatorChatPanel
+
+        # Use a client that captures the messages sent
+        captured_messages = []
+        client = AsyncMock()
+
+        async def fake_create(**kwargs):
+            captured_messages.append(kwargs.get("messages", []))
+            mock_response = MagicMock()
+            mock_response.choices = [MagicMock()]
+            mock_response.choices[0].message.content = "summary"
+            return mock_response
+
+        client.chat.completions.create = fake_create
+
+        panel = CreatorChatPanel(client=client, config=_config(), on_use_text=None)
+        panel._messages.append({"role": "user", "content": "noir game"})
+        panel._messages.append({"role": "assistant", "content": "cool idea"})
+
+        await panel._summarize()
+        # The user content sent to the summarizer should contain both messages
+        assert len(captured_messages) == 1
+        user_msg = captured_messages[0][-1]["content"]
+        assert "User: noir game" in user_msg
+        assert "Designer: cool idea" in user_msg

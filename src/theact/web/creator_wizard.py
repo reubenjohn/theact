@@ -14,6 +14,9 @@ from openai import AsyncOpenAI
 
 from nicegui import ui
 
+from theact.creator.assembler import assemble_game_meta_from_data, enforce_consistency
+from theact.creator.chapter_gen import generate_chapter
+from theact.creator.character_gen import generate_character
 from theact.creator.concept_hints import extract_concept_hints
 from theact.creator.config import CreatorLLMConfig, load_creator_config
 from theact.creator.fixer import fix_validation_errors
@@ -27,8 +30,16 @@ from theact.creator.proposer import (
     revise_characters_proposal,
     revise_setting,
 )
+from theact.creator.session import (
+    char_info_from_data,
+    chap_info_from_data,
+    next_chapter_id,
+    proposal_from_data,
+)
 from theact.creator.validator import check_size_warnings, validate_game_data
+from theact.creator.world_gen import generate_world
 from theact.creator.writer import write_game_files
+from theact.web.creator_chat import CreatorChatPanel
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +77,8 @@ class CreatorWizard:
         self._val_container: ui.element | None = None
         self._files_container: ui.element | None = None
         self._gen_trigger = None
+        self._concept_input: ui.textarea | None = None
+        self._chat_panel: CreatorChatPanel | None = None
 
     def build(self) -> None:
         """Build the wizard page layout."""
@@ -80,6 +93,14 @@ class CreatorWizard:
             self._build_config_error(str(e))
             return
 
+        # Build the brainstorm chat drawer (lives outside main content)
+        self._chat_panel = CreatorChatPanel(
+            client=self._client,
+            config=self._config,
+            on_use_text=self._inject_concept_text,
+        )
+        self._chat_panel.build()
+
         with ui.column().classes("w-full max-w-4xl mx-auto p-4"):
             # Header
             with ui.row().classes("w-full items-center"):
@@ -89,6 +110,14 @@ class CreatorWizard:
                 ui.label("Create a New Game").style(
                     "font-size: 1.4em; font-weight: bold; color: #ccc;"
                 )
+                ui.space()
+                ui.button(
+                    "Brainstorm",
+                    icon="chat",
+                    on_click=lambda: self._chat_panel.toggle(),
+                ).props("outline").tooltip(
+                    "Open brainstorm chat for inspiration"
+                ).props('data-testid="brainstorm-toggle"')
 
             ui.separator()
 
@@ -110,6 +139,11 @@ class CreatorWizard:
                 self._build_step_proposal()
                 self._build_step_generation()
                 self._build_step_finalize()
+
+    def _inject_concept_text(self, text: str) -> None:
+        """Callback for the chat panel to inject text into the concept field."""
+        if self._concept_input:
+            self._concept_input.set_value(text)
 
     # ------------------------------------------------------------------
     # Step 1: Concept Input
@@ -134,6 +168,7 @@ class CreatorWizard:
                 .classes("w-full")
                 .props("outlined rows=6")
             )
+            self._concept_input = concept_input
 
             # Example concepts as clickable chips
             ui.label("Examples:").style(
@@ -570,65 +605,179 @@ class CreatorWizard:
                 )
 
     def _render_generated_files(self, container: ui.element) -> None:
-        """Render all generated game files as collapsible YAML blocks."""
+        """Render all generated game files as collapsible YAML blocks.
+
+        Each file panel includes a per-file feedback input and revise button
+        so users can refine individual files without risking regression in others.
+        """
         container.clear()
         if not self._generated_data:
             return
 
+        def _yaml_str(data: dict) -> str:
+            return yaml.dump(
+                data, default_flow_style=False, allow_unicode=True, sort_keys=False
+            )
+
+        def _build_file_panel(
+            label: str,
+            icon: str,
+            data: dict,
+            file_type: str,
+            stem: str | None = None,
+        ) -> None:
+            """Build one expansion panel with YAML display and per-file revise."""
+            testid = f"file-panel-{file_type}" + (f"-{stem}" if stem else "")
+            with (
+                ui.expansion(label, icon=icon)
+                .classes("w-full")
+                .props(f'data-testid="{testid}"')
+            ):
+                ui.code(_yaml_str(data), language="yaml").classes("w-full")
+
+                # Per-file feedback row
+                with ui.row().classes("w-full items-end gap-2 mt-2"):
+                    fb_input = (
+                        ui.input(placeholder=f"Feedback for {label}...")
+                        .classes("flex-grow")
+                        .props("outlined dense")
+                    )
+                    revise_btn = ui.button(
+                        "Revise",
+                        icon="edit",
+                        on_click=lambda ft=file_type, s=stem, inp=fb_input: (
+                            self._revise_single_file(ft, s, inp)
+                        ),
+                    ).props("outline dense")
+                    revise_btn.props(f'data-testid="revise-{testid}"')
+
         with container:
-            # game.yaml
+            # game.yaml (read-only, assembled from other files)
             with ui.expansion("game.yaml", icon="description").classes("w-full"):
                 ui.code(
-                    yaml.dump(
-                        self._generated_data["game"],
-                        default_flow_style=False,
-                        allow_unicode=True,
-                        sort_keys=False,
-                    ),
-                    language="yaml",
+                    _yaml_str(self._generated_data["game"]), language="yaml"
                 ).classes("w-full")
+                ui.label(
+                    "Auto-assembled from other files. Edit world/characters/chapters instead."
+                ).style("color: #666; font-size: 0.8em; margin-top: 4px;")
 
             # world.yaml
-            with ui.expansion("world.yaml", icon="public").classes("w-full"):
-                ui.code(
-                    yaml.dump(
-                        self._generated_data["world"],
-                        default_flow_style=False,
-                        allow_unicode=True,
-                        sort_keys=False,
-                    ),
-                    language="yaml",
-                ).classes("w-full")
+            _build_file_panel(
+                "world.yaml", "public", self._generated_data["world"], "world"
+            )
 
             # Character files
             for stem, char_data in self._generated_data.get("characters", {}).items():
-                with ui.expansion(f"characters/{stem}.yaml", icon="person").classes(
-                    "w-full"
-                ):
-                    ui.code(
-                        yaml.dump(
-                            char_data,
-                            default_flow_style=False,
-                            allow_unicode=True,
-                            sort_keys=False,
-                        ),
-                        language="yaml",
-                    ).classes("w-full")
+                name = char_data.get("name", stem)
+                _build_file_panel(
+                    f"characters/{stem}.yaml ({name})",
+                    "person",
+                    char_data,
+                    "character",
+                    stem,
+                )
 
             # Chapter files
             for cid, chap_data in self._generated_data.get("chapters", {}).items():
-                with ui.expansion(f"chapters/{cid}.yaml", icon="menu_book").classes(
-                    "w-full"
-                ):
-                    ui.code(
-                        yaml.dump(
-                            chap_data,
-                            default_flow_style=False,
-                            allow_unicode=True,
-                            sort_keys=False,
-                        ),
-                        language="yaml",
-                    ).classes("w-full")
+                title = chap_data.get("title", cid)
+                _build_file_panel(
+                    f"chapters/{cid}.yaml ({title})",
+                    "menu_book",
+                    chap_data,
+                    "chapter",
+                    cid,
+                )
+
+    async def _revise_single_file(
+        self,
+        file_type: str,
+        stem: str | None,
+        feedback_input: ui.input,
+    ) -> None:
+        """Revise a single generated file based on per-file feedback.
+
+        Calls the appropriate generator directly -- no classifier LLM call,
+        no risk of regressing other files.
+        """
+        feedback = (feedback_input.value or "").strip()
+        if not feedback:
+            ui.notify("Enter feedback for this file.", type="info")
+            return
+
+        proposal = proposal_from_data(self._generated_data)
+
+        try:
+            ui.notify(f"Revising {file_type}...", type="ongoing")
+
+            if file_type == "world":
+                self._generated_data["world"] = await generate_world(
+                    proposal=proposal,
+                    client=self._client,
+                    config=self._config,
+                    feedback=feedback,
+                )
+            elif file_type == "character" and stem:
+                char_info = char_info_from_data(self._generated_data, stem)
+                if not char_info:
+                    return
+                self._generated_data["characters"][stem] = await generate_character(
+                    proposal=proposal,
+                    char_info=char_info,
+                    all_stems=list(self._generated_data["characters"].keys()),
+                    prior_characters={
+                        k: v
+                        for k, v in self._generated_data["characters"].items()
+                        if k != stem
+                    },
+                    client=self._client,
+                    config=self._config,
+                    feedback=feedback,
+                )
+            elif file_type == "chapter" and stem:
+                chap_info = chap_info_from_data(self._generated_data, stem)
+                if chap_info:
+                    self._generated_data["chapters"][stem] = await generate_chapter(
+                        proposal=proposal,
+                        chap_info=chap_info,
+                        characters=self._generated_data["characters"],
+                        prior_chapters={
+                            k: v
+                            for k, v in self._generated_data["chapters"].items()
+                            if k != stem
+                        },
+                        next_chapter_id=next_chapter_id(self._generated_data, stem),
+                        client=self._client,
+                        config=self._config,
+                        feedback=feedback,
+                    )
+
+            # Re-assemble game.yaml and enforce consistency
+            self._generated_data["game"] = assemble_game_meta_from_data(
+                self._generated_data
+            )
+            self._generated_data = enforce_consistency(self._generated_data)
+
+            # Re-validate
+            result = validate_game_data(self._generated_data)
+            if not result.valid:
+                self._generated_data, result = await fix_validation_errors(
+                    self._generated_data, result, self._client, self._config
+                )
+            self._validation_result = result
+
+            # Re-render (creates fresh input fields, old feedback_input is gone)
+            self._render_generated_files(self._files_container)
+
+            if result.valid:
+                ui.notify("File revised successfully.", type="positive")
+            else:
+                ui.notify(
+                    f"Revised but {len(result.errors)} validation error(s) remain.",
+                    type="warning",
+                )
+        except Exception as e:
+            logger.exception("Per-file revision failed")
+            ui.notify(f"Revision failed: {e}", type="negative")
 
     async def _revise_generated(
         self, feedback: str, progress_container: ui.element
