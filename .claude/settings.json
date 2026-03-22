@@ -21,7 +21,11 @@
       "Bash(uv pip:*)",
       "Bash(prek)",
       "Bash(uv tool:*)",
-      "Bash(npx -y @playwright/test@latest install --dry-run chromium)"
+      "Bash(npx -y @playwright/test@latest install --dry-run chromium)",
+      "Bash(sort:*)",
+      "Bash(uv lock:*)",
+      "Bash(uvx ruff@0.11.4:*)",
+      "Bash(uv build:*)"
     ]
   }
 }
