@@ -69,6 +69,7 @@ class CreatorWizard:
         self._proposal: dict | None = None
         self._generated_data: dict | None = None
         self._validation_result = None
+        self._revising = False  # Guard against concurrent per-file revisions
 
         # UI references
         self._stepper: ui.stepper | None = None
@@ -122,11 +123,10 @@ class CreatorWizard:
             ui.separator()
 
             # Model info banner
-            if self._config.is_small_model:
+            if not self._config.model:
                 ui.label(
-                    "Warning: Using a small model for game creation. "
-                    "Results may be unreliable. Set CREATOR_MODEL to a "
-                    "larger model (e.g., gpt-4o) in your .env file."
+                    "Warning: No model configured for game creation. "
+                    "Set CREATOR_MODEL (or LLM_MODEL) in .env or Settings."
                 ).classes("w-full").style(
                     "color: #ff9800; background: #332200; padding: 8px; "
                     "border-radius: 4px; font-size: 0.9em;"
@@ -699,11 +699,16 @@ class CreatorWizard:
         Calls the appropriate generator directly -- no classifier LLM call,
         no risk of regressing other files.
         """
+        if self._revising:
+            ui.notify("A revision is already in progress.", type="warning")
+            return
+
         feedback = (feedback_input.value or "").strip()
         if not feedback:
             ui.notify("Enter feedback for this file.", type="info")
             return
 
+        self._revising = True
         proposal = proposal_from_data(self._generated_data)
 
         try:
@@ -778,6 +783,8 @@ class CreatorWizard:
         except Exception as e:
             logger.exception("Per-file revision failed")
             ui.notify(f"Revision failed: {e}", type="negative")
+        finally:
+            self._revising = False
 
     async def _revise_generated(
         self, feedback: str, progress_container: ui.element
