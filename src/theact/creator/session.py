@@ -12,6 +12,7 @@ from rich.console import Console
 from theact.creator.assembler import assemble_game_meta_from_data, enforce_consistency
 from theact.creator.chapter_gen import generate_chapter
 from theact.creator.character_gen import generate_character
+from theact.creator.concept_hints import extract_concept_hints
 from theact.creator.config import CreatorLLMConfig, load_creator_config
 from theact.creator.display import (
     display_game_files,
@@ -165,6 +166,8 @@ async def _decomposed_proposal(
 
     Returns the assembled proposal dict, or None if aborted.
     """
+    hints = extract_concept_hints(concept)
+
     # Step 1: Setting
     console.print("\n[dim]Generating setting...[/dim]\n")
     setting_data = await generate_setting(concept, client, config)
@@ -182,7 +185,9 @@ async def _decomposed_proposal(
 
     # Step 2: Characters
     console.print("\n[dim]Generating characters...[/dim]\n")
-    characters_data = await generate_characters_proposal(setting_data, client, config)
+    characters_data = await generate_characters_proposal(
+        setting_data, client, config, concept=concept, hints=hints
+    )
     _display_yaml("Characters", characters_data)
 
     while True:
@@ -200,7 +205,7 @@ async def _decomposed_proposal(
     # Step 3: Chapters
     console.print("\n[dim]Generating chapters...[/dim]\n")
     chapters_data = await generate_chapters_proposal(
-        setting_data, characters_data, client, config
+        setting_data, characters_data, client, config, concept=concept, hints=hints
     )
     _display_yaml("Chapters", chapters_data)
 

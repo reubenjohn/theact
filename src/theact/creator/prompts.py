@@ -69,7 +69,12 @@ Requested changes: {user_feedback}
 Output the revised YAML. Same format."""
 
 
-PROPOSAL_CHARACTERS_SYSTEM = """\
+def characters_system_prompt(hint_count: int | None = None) -> str:
+    """Build the characters proposal system prompt with dynamic count."""
+    count_line = (
+        f"Exactly {hint_count} characters." if hint_count else "1-3 characters."
+    )
+    return f"""\
 You are a game designer. Given a game setting, propose characters.
 
 Output YAML:
@@ -81,8 +86,31 @@ characters:
     role: "One-line role in the story"
 ```
 
-1-3 characters. Each role is one sentence. Stems are lowercase, no spaces.
+{count_line} Each role is one sentence. Stems are lowercase, no spaces.
 Characters must have distinct personalities and conflicting goals."""
+
+
+PROPOSAL_CHARACTERS_SYSTEM = characters_system_prompt()
+
+
+def characters_user_prompt(
+    title: str,
+    setting: str,
+    tone: str,
+    concept: str | None = None,
+    character_names: list[str] | None = None,
+) -> str:
+    """Build the characters proposal user prompt with optional concept."""
+    text = f"""\
+Game: {title}
+Setting: {setting}
+Tone: {tone}"""
+    if concept:
+        text += f"\n\nOriginal concept:\n{concept}"
+    if character_names:
+        text += f"\n\nThe user specifically requested these characters: {', '.join(character_names)}"
+    text += "\n\nPropose characters for this game in the YAML format specified."
+    return text
 
 
 PROPOSAL_CHARACTERS_USER = """\
@@ -107,7 +135,10 @@ Requested changes: {user_feedback}
 Output the revised YAML. Same format."""
 
 
-PROPOSAL_CHAPTERS_SYSTEM = """\
+def chapters_system_prompt(hint_count: int | None = None) -> str:
+    """Build the chapters proposal system prompt with dynamic count."""
+    count_line = f"Exactly {hint_count} chapters." if hint_count else "3-5 chapters."
+    return f"""\
 You are a game designer. Given a game setting and characters, outline the chapters.
 
 Output YAML:
@@ -119,8 +150,28 @@ chapters:
     summary: "One sentence about what happens"
 ```
 
-3-5 chapters. Each covers 5-10 turns of gameplay. Summaries are one sentence.
+{count_line} Each covers 5-10 turns of gameplay. Summaries are one sentence.
 Chapter IDs are numbered slugs (e.g., "01-the-crash")."""
+
+
+PROPOSAL_CHAPTERS_SYSTEM = chapters_system_prompt()
+
+
+def chapters_user_prompt(
+    title: str,
+    setting: str,
+    character_list: str,
+    concept: str | None = None,
+) -> str:
+    """Build the chapters proposal user prompt with optional concept."""
+    text = f"""\
+Game: {title}
+Setting: {setting}
+Characters: {character_list}"""
+    if concept:
+        text += f"\n\nOriginal concept:\n{concept}"
+    text += "\n\nOutline the chapter arc in the YAML format specified."
+    return text
 
 
 PROPOSAL_CHAPTERS_USER = """\

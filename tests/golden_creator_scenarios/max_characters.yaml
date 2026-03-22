@@ -1,0 +1,17 @@
+name: Max Characters Clamped
+description: >
+  Concept asks for 5 characters but the runtime limit is 3.
+  Hints should clamp character_count to 3. LLM should produce
+  at most 3 characters.
+concept: "An epic with 5 characters"
+assertions:
+  hints:
+    character_count: 3
+  characters:
+    count_max: 3
+  chapters:
+    count_min: 3
+    count_max: 5
+  setting:
+    has_title: true
+    has_id: true

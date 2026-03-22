@@ -1,0 +1,18 @@
+name: Eight Chapters
+description: >
+  Concept specifies 8 chapters but no character count.
+  Hints should extract chapter_count=8 and character_count=null.
+  LLM should produce exactly 8 chapters.
+concept: "A survival adventure across 8 chapters"
+assertions:
+  hints:
+    chapter_count: 8
+    character_count: null
+  characters:
+    count_min: 1
+    count_max: 3
+  chapters:
+    count: 8
+  setting:
+    has_title: true
+    has_id: true

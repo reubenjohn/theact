@@ -1,0 +1,18 @@
+name: Default Fantasy
+description: >
+  No explicit hints in the concept. Expects defaults: 1-3 characters,
+  3-5 chapters, and a valid setting with title and id.
+concept: "A fantasy adventure in a magical realm"
+assertions:
+  hints:
+    character_count: null
+    chapter_count: null
+  characters:
+    count_min: 1
+    count_max: 3
+  chapters:
+    count_min: 3
+    count_max: 5
+  setting:
+    has_title: true
+    has_id: true

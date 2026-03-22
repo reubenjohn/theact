@@ -1,0 +1,20 @@
+name: Two Characters Noir
+description: >
+  Concept specifies exactly 2 named characters and 4 chapters.
+  Hints should extract both counts and names. LLM should produce
+  exactly 2 characters and 4 chapters.
+concept: "A noir detective mystery with 2 characters named Dolores and Kowalski, 4 chapters"
+assertions:
+  hints:
+    character_count: 2
+    chapter_count: 4
+    character_names_include:
+      - "Dolores"
+      - "Kowalski"
+  characters:
+    count: 2
+  chapters:
+    count: 4
+  setting:
+    has_title: true
+    has_id: true

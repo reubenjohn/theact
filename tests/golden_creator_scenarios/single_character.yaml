@@ -1,0 +1,16 @@
+name: Single Character
+description: >
+  Concept specifies exactly 1 character. Hints should extract
+  character_count=1. LLM should produce exactly 1 character.
+concept: "A solo adventure with 1 character"
+assertions:
+  hints:
+    character_count: 1
+  characters:
+    count: 1
+  chapters:
+    count_min: 3
+    count_max: 5
+  setting:
+    has_title: true
+    has_id: true

@@ -28,6 +28,10 @@ from theact.creator.prompts import (
     TARGETED_REVISION_USER,
     WORLD_SYSTEM,
     WORLD_USER,
+    chapters_system_prompt,
+    chapters_user_prompt,
+    characters_system_prompt,
+    characters_user_prompt,
 )
 
 
@@ -201,3 +205,67 @@ class TestPerFilePromptsUnder300Tokens:
 
     def test_classify_system(self):
         assert self._token_estimate(CLASSIFY_SYSTEM) < self.MAX_TOKENS
+
+    def test_characters_system_with_hint(self):
+        prompt = characters_system_prompt(hint_count=2)
+        assert self._token_estimate(prompt) < self.MAX_TOKENS
+
+    def test_chapters_system_with_hint(self):
+        prompt = chapters_system_prompt(hint_count=8)
+        assert self._token_estimate(prompt) < self.MAX_TOKENS
+
+
+class TestDynamicPromptFunctions:
+    """Tests for the dynamic prompt template functions."""
+
+    def test_characters_system_default(self):
+        prompt = characters_system_prompt()
+        assert "1-3 characters" in prompt
+
+    def test_characters_system_with_count(self):
+        prompt = characters_system_prompt(hint_count=2)
+        assert "Exactly 2 characters" in prompt
+        assert "1-3" not in prompt
+
+    def test_characters_system_is_backward_compatible(self):
+        assert PROPOSAL_CHARACTERS_SYSTEM == characters_system_prompt()
+
+    def test_chapters_system_default(self):
+        prompt = chapters_system_prompt()
+        assert "3-5 chapters" in prompt
+
+    def test_chapters_system_with_count(self):
+        prompt = chapters_system_prompt(hint_count=8)
+        assert "Exactly 8 chapters" in prompt
+        assert "3-5" not in prompt
+
+    def test_chapters_system_is_backward_compatible(self):
+        assert PROPOSAL_CHAPTERS_SYSTEM == chapters_system_prompt()
+
+    def test_characters_user_without_concept(self):
+        prompt = characters_user_prompt("Title", "Setting", "Tone")
+        assert "Title" in prompt
+        assert "Original concept" not in prompt
+
+    def test_characters_user_with_concept(self):
+        prompt = characters_user_prompt(
+            "Title", "Setting", "Tone", concept="My concept"
+        )
+        assert "Original concept" in prompt
+        assert "My concept" in prompt
+
+    def test_characters_user_with_names(self):
+        prompt = characters_user_prompt(
+            "Title", "Setting", "Tone", character_names=["Maya", "Joaquin"]
+        )
+        assert "Maya" in prompt
+        assert "Joaquin" in prompt
+
+    def test_chapters_user_without_concept(self):
+        prompt = chapters_user_prompt("Title", "Setting", "Maya, Joaquin")
+        assert "Original concept" not in prompt
+
+    def test_chapters_user_with_concept(self):
+        prompt = chapters_user_prompt("Title", "Setting", "Maya", concept="My concept")
+        assert "Original concept" in prompt
+        assert "My concept" in prompt

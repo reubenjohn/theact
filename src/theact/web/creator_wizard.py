@@ -14,6 +14,7 @@ from openai import AsyncOpenAI
 
 from nicegui import ui
 
+from theact.creator.concept_hints import extract_concept_hints
 from theact.creator.config import CreatorLLMConfig, load_creator_config
 from theact.creator.fixer import fix_validation_errors
 from theact.creator.pipeline import run_generation_pipeline
@@ -183,6 +184,7 @@ class CreatorWizard:
 
     async def _run_proposal_phase(self, progress_container: ui.element) -> None:
         """Run setting -> characters -> chapters proposal generation."""
+        hints = extract_concept_hints(self._concept)
 
         def _progress(msg: str) -> ui.label:
             with progress_container:
@@ -203,7 +205,11 @@ class CreatorWizard:
         # Characters
         label = _progress("Creating characters...")
         self._characters_data = await generate_characters_proposal(
-            self._setting_data, self._client, self._config
+            self._setting_data,
+            self._client,
+            self._config,
+            concept=self._concept,
+            hints=hints,
         )
         char_count = len(self._characters_data.get("characters", []))
         label.style("color: #69f0ae;")
@@ -212,7 +218,12 @@ class CreatorWizard:
         # Chapters
         label = _progress("Planning chapters...")
         self._chapters_data = await generate_chapters_proposal(
-            self._setting_data, self._characters_data, self._client, self._config
+            self._setting_data,
+            self._characters_data,
+            self._client,
+            self._config,
+            concept=self._concept,
+            hints=hints,
         )
         chap_count = len(self._chapters_data.get("chapters", []))
         label.style("color: #69f0ae;")
