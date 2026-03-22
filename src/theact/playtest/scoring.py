@@ -83,6 +83,37 @@ _STOP_WORDS = {
 }
 
 
+def _content_words(text: str) -> set[str]:
+    """Extract content words (>3 chars after stripping punctuation)."""
+    return {
+        stripped
+        for w in text.lower().split()
+        if len(stripped := w.strip(".,;:!?\"'()")) > 3
+    }
+
+
+def has_fact_summary_overlap(
+    facts: list[str], summary: str, threshold: float = 0.7
+) -> bool:
+    """Check if any fact's content words overlap with summary above threshold."""
+    if not summary or not facts:
+        return False
+    summary_words = _content_words(summary)
+    for fact in facts:
+        fact_words = [
+            w.strip(".,;:!?\"'()")
+            for w in fact.lower().split()
+            if len(w.strip(".,;:!?\"'()")) > 3
+        ]
+        if (
+            fact_words
+            and sum(1 for w in fact_words if w in summary_words) / len(fact_words)
+            > threshold
+        ):
+            return True
+    return False
+
+
 @dataclass
 class TurnQualityScore:
     """Quality metrics for a single playtest turn."""

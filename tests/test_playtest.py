@@ -580,7 +580,8 @@ class TestIssueDetection:
                     character="Maya",
                     old_summary="",
                     new_summary="New summary",
-                    new_facts=[f"Fact {i}" for i in range(8)],
+                    new_facts=[f"Fact {i}" for i in range(5)],
+                    raw_fact_count=8,  # model output 8, parser truncated to 5
                 )
             ],
         )
@@ -627,6 +628,107 @@ class TestIssueDetection:
             runner.logger.log_issue(1, issue)
         issues = runner.logger.all_issues()
         assert not any("memory_overflow" in i for _, i in issues)
+
+    def test_detects_memory_fact_overlap(self):
+        runner = PlaytestRunner(PlaytestConfig(game_id="test"))
+        result = _make_turn_result(
+            turn=1,
+            narration="Some text.",
+            memory_diffs=[
+                MemoryDiff(
+                    character="Maya",
+                    old_summary="",
+                    new_summary="Maya explored the dark dense jungle and found a river",
+                    new_facts=["Maya explored the dark dense jungle carefully"],
+                )
+            ],
+        )
+        detected = runner._detect_issues(1, result)
+        runner.logger.log_turn_result(1, result, 1.0)
+        for issue in detected:
+            runner.logger.log_issue(1, issue)
+        issues = runner.logger.all_issues()
+        assert any("memory_fact_overlap" in i for _, i in issues)
+
+    def test_no_overlap_for_distinct_facts(self):
+        runner = PlaytestRunner(PlaytestConfig(game_id="test"))
+        result = _make_turn_result(
+            turn=1,
+            narration="Some text.",
+            memory_diffs=[
+                MemoryDiff(
+                    character="Maya",
+                    old_summary="",
+                    new_summary="Maya explored the jungle and found a river",
+                    new_facts=["Has a flare gun from the wreckage"],
+                )
+            ],
+        )
+        detected = runner._detect_issues(1, result)
+        assert not any("memory_fact_overlap" in i for i in detected)
+
+    def test_detects_memory_stale(self):
+        runner = PlaytestRunner(PlaytestConfig(game_id="test"))
+        facts = ["Fact A", "Fact B"]
+        r1 = _make_turn_result(
+            turn=1,
+            narration="First turn.",
+            memory_diffs=[
+                MemoryDiff(
+                    character="Maya",
+                    old_summary="",
+                    new_summary="Summary 1",
+                    new_facts=list(facts),
+                )
+            ],
+        )
+        runner.logger.log_turn_result(1, r1, 1.0)
+
+        r2 = _make_turn_result(
+            turn=2,
+            narration="Second turn.",
+            memory_diffs=[
+                MemoryDiff(
+                    character="Maya",
+                    old_summary="Summary 1",
+                    new_summary="Summary 2",
+                    new_facts=list(facts),  # identical facts
+                )
+            ],
+        )
+        detected = runner._detect_issues(2, r2)
+        assert any("memory_stale" in i for i in detected)
+
+    def test_no_stale_for_changed_facts(self):
+        runner = PlaytestRunner(PlaytestConfig(game_id="test"))
+        r1 = _make_turn_result(
+            turn=1,
+            narration="First turn.",
+            memory_diffs=[
+                MemoryDiff(
+                    character="Maya",
+                    old_summary="",
+                    new_summary="Summary 1",
+                    new_facts=["Fact A"],
+                )
+            ],
+        )
+        runner.logger.log_turn_result(1, r1, 1.0)
+
+        r2 = _make_turn_result(
+            turn=2,
+            narration="Second turn.",
+            memory_diffs=[
+                MemoryDiff(
+                    character="Maya",
+                    old_summary="Summary 1",
+                    new_summary="Summary 2",
+                    new_facts=["Fact B"],  # different
+                )
+            ],
+        )
+        detected = runner._detect_issues(2, r2)
+        assert not any("memory_stale" in i for i in detected)
 
 
 # -- Game File Verification ------------------------------------------------

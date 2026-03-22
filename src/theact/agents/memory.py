@@ -114,8 +114,18 @@ async def run_memory_update(
     new_summary = data.get("summary", old_summary) or old_summary
 
     # Full rewrite: model outputs complete curated fact list each turn
-    raw_facts = data.get("key_facts") or data.get("add") or []
-    new_facts = [str(f) for f in raw_facts if f][:MAX_KEY_FACTS]
+    if "key_facts" in data:
+        raw_facts = data["key_facts"] or []
+    elif "add" in data:
+        logger.warning(
+            "Memory update for %s used old 'add' format instead of 'key_facts'",
+            character.name,
+        )
+        raw_facts = data["add"] or []
+    else:
+        raw_facts = []
+    all_facts = [str(f) for f in raw_facts if f]
+    new_facts = all_facts[:MAX_KEY_FACTS]
 
     return MemoryDiff(
         character=character.name,
@@ -123,4 +133,5 @@ async def run_memory_update(
         new_summary=new_summary.strip(),
         old_facts=old_facts,
         new_facts=new_facts,
+        raw_fact_count=len(all_facts),
     )

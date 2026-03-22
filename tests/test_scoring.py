@@ -8,6 +8,7 @@ from theact.playtest.scoring import (
     _check_memory_relevance,
     _check_personality_markers,
     _extract_personality_markers,
+    has_fact_summary_overlap,
     score_turn,
 )
 
@@ -267,3 +268,25 @@ class TestScoreTurn:
         # char1 should score high, char2 should score low
         # Average should be between
         assert 0.0 < score.character_personality < 1.0
+
+
+class TestFactSummaryOverlap:
+    def test_high_overlap_detected(self):
+        facts = ["Maya explored the dark dense jungle carefully"]
+        summary = "Maya explored the dark dense jungle and found a river"
+        assert has_fact_summary_overlap(facts, summary) is True
+
+    def test_distinct_facts_no_overlap(self):
+        facts = ["Has a flare gun from the wreckage"]
+        summary = "Maya explored the jungle and found a river"
+        assert has_fact_summary_overlap(facts, summary) is False
+
+    def test_empty_inputs(self):
+        assert has_fact_summary_overlap([], "some summary") is False
+        assert has_fact_summary_overlap(["fact"], "") is False
+
+    def test_short_words_ignored(self):
+        # Words <= 3 chars after stripping should not count
+        facts = ["He is on it"]
+        summary = "He is on it too"
+        assert has_fact_summary_overlap(facts, summary) is False

@@ -36,6 +36,7 @@ class MemoryDiff:
     new_summary: str
     old_facts: list[str] = field(default_factory=list)
     new_facts: list[str] = field(default_factory=list)
+    raw_fact_count: int = 0  # before truncation, for overflow detection
 
 
 @dataclass

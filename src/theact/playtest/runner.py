@@ -20,7 +20,7 @@ from theact.playtest.report import (
     write_report,
 )
 from theact.agents.prompts import MAX_KEY_FACTS
-from theact.playtest.scoring import score_turn
+from theact.playtest.scoring import has_fact_summary_overlap, score_turn
 
 logger = logging.getLogger(__name__)
 
@@ -271,33 +271,16 @@ class PlaytestRunner:
         if self.logger.is_repeating(result.narrator.narration, window=3):
             issues.append("narrator_repeating")
 
-        # Memory overflow -- facts exceeding MAX_KEY_FACTS (truncated by parser)
+        # Memory overflow -- model output more facts than MAX_KEY_FACTS (truncated)
         for diff in result.memory_diffs:
-            if len(diff.new_facts) > MAX_KEY_FACTS:
+            if diff.raw_fact_count > MAX_KEY_FACTS:
                 issues.append(f"memory_overflow:{diff.character}")
 
         # Fact-summary overlap -- facts that repeat what's in the summary
         for diff in result.memory_diffs:
-            if not diff.new_summary or not diff.new_facts:
-                continue
-            summary_words = {
-                w.strip(".,;:!?\"'()")
-                for w in diff.new_summary.lower().split()
-                if len(w) > 3
-            }
-            for fact in diff.new_facts:
-                fact_words = [
-                    w.strip(".,;:!?\"'()") for w in fact.lower().split() if len(w) > 3
-                ]
-                if (
-                    fact_words
-                    and sum(1 for w in fact_words if w in summary_words)
-                    / len(fact_words)
-                    > 0.7
-                ):
-                    char_id = diff.character.lower().replace(" ", "_")
-                    issues.append(f"memory_fact_overlap:{char_id}")
-                    break  # one flag per character is enough
+            if has_fact_summary_overlap(diff.new_facts, diff.new_summary):
+                char_id = diff.character.lower().replace(" ", "_")
+                issues.append(f"memory_fact_overlap:{char_id}")
 
         # Stale facts -- facts unchanged from previous turn
         if self.logger.turns:

@@ -10,6 +10,7 @@ import yaml
 
 from theact.playtest.config import PlaytestConfig
 from theact.playtest.logger import PlaytestLogger
+from theact.playtest.scoring import has_fact_summary_overlap
 
 if TYPE_CHECKING:
     from theact.llm.call_log import LLMCallLog
@@ -63,8 +64,7 @@ def _compute_memory_health(logger: PlaytestLogger) -> dict:
 
     # Collect per-character, per-turn fact data
     char_fact_history: dict[str, list[list[str]]] = {}
-    overlap_counts: dict[str, int] = 0  # type: ignore[assignment]
-    overlap_counts = {}
+    overlap_counts: dict[str, int] = {}
     overflow_counts: dict[str, int] = {}
     stale_counts: dict[str, int] = {}
     turns_with_memory = 0
@@ -76,32 +76,14 @@ def _compute_memory_health(logger: PlaytestLogger) -> dict:
         for char, facts in t.memory_facts.items():
             char_fact_history.setdefault(char, []).append(facts)
 
-            # At cap?
+            # Overflow?
             if len(facts) > MAX_KEY_FACTS:
                 overflow_counts[char] = overflow_counts.get(char, 0) + 1
 
             # Overlap with summary?
             summary = t.memory_updates.get(char, "")
-            if summary and facts:
-                summary_words = {
-                    w.strip(".,;:!?\"'()")
-                    for w in summary.lower().split()
-                    if len(w) > 3
-                }
-                for fact in facts:
-                    fact_words = [
-                        w.strip(".,;:!?\"'()")
-                        for w in fact.lower().split()
-                        if len(w) > 3
-                    ]
-                    if (
-                        fact_words
-                        and sum(1 for w in fact_words if w in summary_words)
-                        / len(fact_words)
-                        > 0.7
-                    ):
-                        overlap_counts[char] = overlap_counts.get(char, 0) + 1
-                        break
+            if has_fact_summary_overlap(facts, summary):
+                overlap_counts[char] = overlap_counts.get(char, 0) + 1
 
     # Stale: facts identical to previous turn
     for char, history in char_fact_history.items():
