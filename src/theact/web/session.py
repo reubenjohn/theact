@@ -29,6 +29,12 @@ from theact.web.sidebar import GameStateSidebar
 from theact.web.state import GameSessionState
 from theact.web.streaming import StreamRenderer
 from theact.web.toolbar import GameplayToolbar
+from theact.web.styles import (
+    ERROR_COLOR,
+    INFO_COLOR,
+    WARNING_ACCENT_COLOR,
+    WARNING_COLOR,
+)
 from theact.web.turn_runner import TurnRunner
 
 logger = logging.getLogger(__name__)
@@ -603,11 +609,11 @@ class GameplaySession:
                 ui.button(
                     "Open Read-Only",
                     on_click=lambda: self._enter_readonly(dlg),
-                ).props("flat").style("color: #42a5f5;")
+                ).props("flat").style(f"color: {INFO_COLOR};")
                 ui.button(
                     "Force Unlock",
                     on_click=lambda: self._force_unlock(dlg),
-                ).props("flat").style("color: #ffa726;")
+                ).props("flat").style(f"color: {WARNING_ACCENT_COLOR};")
                 ui.button(
                     "Back to Menu",
                     on_click=lambda: self._back_to_menu(dlg),
@@ -671,7 +677,7 @@ class GameplaySession:
             message="Undo the most recent turn? This cannot be reversed.",
             on_confirm=lambda: self._toolbar_undo(1),
             confirm_text="Undo",
-            confirm_color="#ff9800",
+            confirm_color=WARNING_COLOR,
         )
 
     def _shortcut_save_as(self) -> None:
@@ -709,14 +715,16 @@ class GameplaySession:
     ) -> None:
         """Show error with retry button in the turn card."""
         with turn_card:
-            ui.label(f"Error: {error_msg}").style("color: #ff5252; margin-top: 8px;")
+            ui.label(f"Error: {error_msg}").style(
+                f"color: {ERROR_COLOR}; margin-top: 8px;"
+            )
             ui.button(
                 "Retry",
                 icon="refresh",
                 on_click=lambda: self._retry_failed_turn(player_input),
-            ).props("flat dense").style("color: #ffa726; margin-top: 4px;").tooltip(
-                "Retry with the same input"
-            )
+            ).props("flat dense").style(
+                f"color: {WARNING_ACCENT_COLOR}; margin-top: 4px;"
+            ).tooltip("Retry with the same input")
 
     async def _retry_failed_turn(self, player_input: str) -> None:
         """Retry a failed turn: reload state from disk and replay."""

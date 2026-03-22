@@ -12,6 +12,7 @@ from typing import Awaitable, Callable
 from nicegui import ui
 
 from theact.web.components.dialogs import number_input_dialog, text_input_dialog
+from theact.web.styles import SUCCESS_COLOR, WARNING_COLOR
 
 
 class GameplayToolbar:
@@ -106,7 +107,7 @@ class GameplayToolbar:
             min_val=1,
             max_val=100,
             submit_text="Undo",
-            submit_color="#ff9800",
+            submit_color=WARNING_COLOR,
         )
 
     async def _handle_retry(self) -> None:
@@ -126,7 +127,7 @@ class GameplayToolbar:
             label="Save name",
             placeholder="my-save-fork",
             submit_text="Create",
-            submit_color="#69f0ae",
+            submit_color=SUCCESS_COLOR,
         )
 
     def _handle_history(self) -> None:

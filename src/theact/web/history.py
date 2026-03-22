@@ -18,6 +18,12 @@ from nicegui import ui
 
 from theact.versioning import git_save
 from theact.versioning.git_save import TurnInfo
+from theact.web.styles import (
+    ERROR_COLOR,
+    INFO_COLOR,
+    SUCCESS_COLOR,
+    WARNING_ACCENT_COLOR,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -161,14 +167,14 @@ class TurnHistoryBrowser:
             .classes("w-full")
             .style(
                 f"background: {'#2d3748' if is_current else '#252525'}; "
-                f"border-left: 3px solid {'#69f0ae' if is_current else '#555'}; "
+                f"border-left: 3px solid {SUCCESS_COLOR if is_current else '#555'}; "
                 f"padding: 8px; cursor: pointer;"
             )
         ):
             with ui.row().classes("w-full items-center"):
                 # Turn number badge
                 ui.badge(str(entry.turn)).style(
-                    f"background: {'#69f0ae' if is_current else '#555'}; "
+                    f"background: {SUCCESS_COLOR if is_current else '#555'}; "
                     f"color: {'#000' if is_current else '#ccc'};"
                 )
                 # Summary and time
@@ -201,14 +207,14 @@ class TurnHistoryBrowser:
         with ui.row().classes("gap-0"):
             ui.button(icon="visibility", on_click=make_view_handler(turn_num)).props(
                 "flat dense round"
-            ).style("color: #42a5f5;").tooltip("View snapshot")
+            ).style(f"color: {INFO_COLOR};").tooltip("View snapshot")
 
             if turn_num < self.current_turn:
                 ui.button(
                     icon="restore", on_click=make_restore_handler(turn_num)
-                ).props("flat dense round").style("color: #ffa726;").tooltip(
-                    "Restore to here"
-                )
+                ).props("flat dense round").style(
+                    f"color: {WARNING_ACCENT_COLOR};"
+                ).tooltip("Restore to here")
 
     # --- Peek Viewer ---
 
@@ -221,12 +227,12 @@ class TurnHistoryBrowser:
             files = git_save.peek_at_turn(self.save_path, turn_number)
         except ValueError as e:
             with self._detail_container:
-                ui.label(f"Error: {e}").style("color: #ff5252;")
+                ui.label(f"Error: {e}").style(f"color: {ERROR_COLOR};")
             return
 
         with self._detail_container:
             ui.label(f"Turn {turn_number} -- Historical Snapshot (read-only)").style(
-                "color: #ffa726; font-weight: bold; font-size: 0.95em; "
+                f"color: {WARNING_ACCENT_COLOR}; font-weight: bold; font-size: 0.95em; "
                 "margin-bottom: 8px;"
             )
 
@@ -303,7 +309,7 @@ class TurnHistoryBrowser:
                         summary = mem.get("summary", "No summary")
                         facts = mem.get("key_facts", [])
                         ui.label(f"{mem.get('character', char_name)}").style(
-                            "color: #69f0ae; font-weight: bold; font-size: 0.85em;"
+                            f"color: {SUCCESS_COLOR}; font-weight: bold; font-size: 0.85em;"
                         )
                         ui.label(f"  {summary}").style("color: #ccc; font-size: 0.8em;")
                         for fact in facts[:5]:
@@ -355,7 +361,7 @@ class TurnHistoryBrowser:
             icon="check_circle" if is_selected else "radio_button_unchecked",
             on_click=make_toggle_handler(entry.turn),
         ).props("flat dense round").style(
-            f"color: {'#42a5f5' if is_selected else '#666'};"
+            f"color: {INFO_COLOR if is_selected else '#666'};"
         )
 
     def _show_diff(self) -> None:
@@ -372,12 +378,12 @@ class TurnHistoryBrowser:
             diff_text = git_save.diff_turns(self.save_path, turn_a, turn_b)
         except ValueError as e:
             with self._detail_container:
-                ui.label(f"Error: {e}").style("color: #ff5252;")
+                ui.label(f"Error: {e}").style(f"color: {ERROR_COLOR};")
             return
 
         with self._detail_container:
             ui.label(f"Diff: Turn {turn_a} vs Turn {turn_b}").style(
-                "color: #42a5f5; font-weight: bold; font-size: 0.95em; "
+                f"color: {INFO_COLOR}; font-weight: bold; font-size: 0.95em; "
                 "margin-bottom: 8px;"
             )
 
@@ -404,19 +410,19 @@ class TurnHistoryBrowser:
                 escaped = html_lib.escape(line)
                 if line.startswith("+") and not line.startswith("+++"):
                     html_lines.append(
-                        f'<div style="color: #69f0ae; font-family: monospace; '
+                        f'<div style="color: {SUCCESS_COLOR}; font-family: monospace; '
                         f"font-size: 0.8em; background: #1a3a1a; "
                         f'padding: 1px 4px;">{escaped}</div>'
                     )
                 elif line.startswith("-") and not line.startswith("---"):
                     html_lines.append(
-                        f'<div style="color: #ff5252; font-family: monospace; '
+                        f'<div style="color: {ERROR_COLOR}; font-family: monospace; '
                         f"font-size: 0.8em; background: #3a1a1a; "
                         f'padding: 1px 4px;">{escaped}</div>'
                     )
                 elif line.startswith("@@"):
                     html_lines.append(
-                        f'<div style="color: #42a5f5; font-family: monospace; '
+                        f'<div style="color: {INFO_COLOR}; font-family: monospace; '
                         f'font-size: 0.8em; padding: 1px 4px;">{escaped}</div>'
                     )
                 else:
@@ -450,7 +456,7 @@ class TurnHistoryBrowser:
             ui.label(
                 f"This will undo {steps} turn{'s' if steps != 1 else ''}. "
                 f"This cannot be reversed."
-            ).style("color: #ffa726; font-size: 0.9em;")
+            ).style(f"color: {WARNING_ACCENT_COLOR}; font-size: 0.9em;")
             ui.label("Tip: Use Fork first to keep a copy of the current state.").style(
                 "color: #888; font-size: 0.8em;"
             )
@@ -475,5 +481,5 @@ class TurnHistoryBrowser:
 
                 ui.button("Restore", on_click=confirm, icon="restore").props(
                     "flat"
-                ).style("color: #ffa726;")
+                ).style(f"color: {WARNING_ACCENT_COLOR};")
         dialog.open()

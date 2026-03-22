@@ -16,6 +16,7 @@ from theact.llm.config import load_llm_config
 from theact.web.menu import MenuBuilder
 from theact.web.session import GameplaySession
 from theact.web.state import GameSessionState
+from theact.web.styles import ERROR_COLOR
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ def setup_app() -> None:
         try:
             llm_config = load_llm_config()
         except ValueError as e:
-            ui.label(str(e)).style("color: #ff5252; padding: 20px;")
+            ui.label(str(e)).style(f"color: {ERROR_COLOR}; padding: 20px;")
             ui.label("Create a .env file with LLM_API_KEY=your_key_here").style(
                 "color: #999; padding: 0 20px;"
             )

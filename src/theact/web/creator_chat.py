@@ -16,6 +16,7 @@ from nicegui import ui
 from theact.creator.brainstorm import BrainstormConversation
 from theact.creator.config import CreatorLLMConfig
 from theact.llm.inference import extract_think_tags
+from theact.web.styles import ERROR_COLOR
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +154,9 @@ class CreatorChatPanel:
             logger.exception("Chat message failed")
             thinking.delete()
             with self._chat_container:
-                ui.label(f"Error: {e}").style("color: #ff5252; font-size: 0.85em;")
+                ui.label(f"Error: {e}").style(
+                    f"color: {ERROR_COLOR}; font-size: 0.85em;"
+                )
         finally:
             self._sending = False
 

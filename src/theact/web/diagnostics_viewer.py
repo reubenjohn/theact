@@ -15,6 +15,7 @@ from nicegui import ui
 
 from theact.io.save_manager import SAVES_DIR
 from theact.llm.call_log import LLMCallLog, LLMCallRecord
+from theact.web.styles import WARNING_ACCENT_COLOR
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +257,7 @@ def _build_call_log_tab(call_log: LLMCallLog) -> None:
         ui.label(f"Total retries: {summary['total_retries']}")
         if summary["length_finishes"] > 0:
             ui.label(f"Length finishes: {summary['length_finishes']}").style(
-                "color: #ffa726;"
+                f"color: {WARNING_ACCENT_COLOR};"
             )
 
 

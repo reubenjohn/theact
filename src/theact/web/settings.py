@@ -7,6 +7,7 @@ import logging
 from nicegui import ui
 
 from theact.io.settings_store import SettingsData, load_settings, save_settings
+from theact.web.styles import ERROR_COLOR, SUCCESS_COLOR
 
 logger = logging.getLogger(__name__)
 
@@ -172,13 +173,13 @@ def _build_llm_section(settings: SettingsData) -> dict:
                     )
                     if ok:
                         test_status.text = f"Connected: {msg}"
-                        test_status.style("color: #69f0ae;")
+                        test_status.style(f"color: {SUCCESS_COLOR};")
                     else:
                         test_status.text = f"Failed: {msg}"
-                        test_status.style("color: #ff5252;")
+                        test_status.style(f"color: {ERROR_COLOR};")
                 except Exception as e:
                     test_status.text = f"Error: {e}"
-                    test_status.style("color: #ff5252;")
+                    test_status.style(f"color: {ERROR_COLOR};")
 
             test_btn.on_click(on_test)
 

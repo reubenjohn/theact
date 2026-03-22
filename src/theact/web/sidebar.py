@@ -12,7 +12,7 @@ from nicegui import ui
 from theact.models.character import Character
 from theact.models.memory import CharacterMemory
 from theact.web.state import GameSessionState
-from theact.web.styles import get_character_color
+from theact.web.styles import ERROR_COLOR, SUCCESS_COLOR, get_character_color
 
 
 def _truncate(text: str, max_len: int = 80) -> str:
@@ -153,7 +153,7 @@ class GameStateSidebar:
             icon = "check_box" if hit else "check_box_outline_blank"
             with ui.row().classes("items-center gap-1"):
                 ui.icon(icon, size="xs").style(
-                    f"color: {'#69f0ae' if hit else '#666'};"
+                    f"color: {SUCCESS_COLOR if hit else '#666'};"
                 )
                 ui.label(beat).classes(
                     f"text-sm {'line-through text-gray-500' if hit else ''}"
@@ -247,6 +247,6 @@ class GameStateSidebar:
             if char.secret:
                 with ui.expansion("Reveal Secret").classes("mt-2"):
                     ui.label("Spoiler warning!").classes("text-xs").style(
-                        "color: #ff5252;"
+                        f"color: {ERROR_COLOR};"
                     )
                     ui.label(char.secret).classes("text-sm").style("color: #ffab91;")

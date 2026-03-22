@@ -30,6 +30,11 @@ SYSTEM_COLOR = "#9e9e9e"
 
 # --- Status / info ---
 ERROR_COLOR = "#ff5252"
+SUCCESS_COLOR = "#69f0ae"  # green checkmark / completion
+WARNING_COLOR = "#ff9800"  # amber warnings
+WARNING_ACCENT_COLOR = "#ffa726"  # lighter amber for secondary warnings
+INFO_COLOR = "#42a5f5"  # blue links / info actions
+MUTED_COLOR = "#666666"  # disabled / inactive text
 
 # --- Turn info bar ---
 BEAT_COLOR = "#69f0ae"  # green, matches character palette

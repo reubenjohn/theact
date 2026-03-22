@@ -40,6 +40,7 @@ from theact.creator.validator import check_size_warnings, validate_game_data
 from theact.creator.world_gen import generate_world
 from theact.creator.writer import write_game_files
 from theact.web.creator_chat import CreatorChatPanel
+from theact.web.styles import ERROR_COLOR, SUCCESS_COLOR, WARNING_COLOR
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +129,7 @@ class CreatorWizard:
                     "Warning: No model configured for game creation. "
                     "Set CREATOR_MODEL (or LLM_MODEL) in .env or Settings."
                 ).classes("w-full").style(
-                    "color: #ff9800; background: #332200; padding: 8px; "
+                    f"color: {WARNING_COLOR}; background: #332200; padding: 8px; "
                     "border-radius: 4px; font-size: 0.9em;"
                 )
 
@@ -207,7 +208,7 @@ class CreatorWizard:
                 except Exception as e:
                     logger.exception("Proposal generation failed")
                     with progress_container:
-                        ui.label(f"Error: {e}").style("color: #ff5252;")
+                        ui.label(f"Error: {e}").style(f"color: {ERROR_COLOR};")
                         ui.button("Retry", on_click=on_generate, icon="refresh").props(
                             "outline"
                         )
@@ -234,7 +235,7 @@ class CreatorWizard:
         self._setting_data = await generate_setting(
             self._concept, self._client, self._config
         )
-        label.style("color: #69f0ae;")
+        label.style(f"color: {SUCCESS_COLOR};")
         label.text = "Setting generated"
 
         # Characters
@@ -247,7 +248,7 @@ class CreatorWizard:
             hints=hints,
         )
         char_count = len(self._characters_data.get("characters", []))
-        label.style("color: #69f0ae;")
+        label.style(f"color: {SUCCESS_COLOR};")
         label.text = f"Characters generated ({char_count} characters)"
 
         # Chapters
@@ -261,7 +262,7 @@ class CreatorWizard:
             hints=hints,
         )
         chap_count = len(self._chapters_data.get("chapters", []))
-        label.style("color: #69f0ae;")
+        label.style(f"color: {SUCCESS_COLOR};")
         label.text = f"Chapters generated ({chap_count} chapters)"
 
         # Assemble
@@ -344,7 +345,7 @@ class CreatorWizard:
             for char in self._proposal.get("characters", []):
                 with ui.card().classes("w-full"):
                     with ui.row().classes("items-center gap-2"):
-                        ui.icon("person").style("color: #69f0ae;")
+                        ui.icon("person").style(f"color: {SUCCESS_COLOR};")
                         ui.label(char.get("name", "?")).style(
                             "font-weight: bold; color: #fff;"
                         )
@@ -390,7 +391,7 @@ class CreatorWizard:
             self._setting_data = await revise_setting(
                 self._setting_data, feedback, self._client, self._config
             )
-            label.style("color: #69f0ae;")
+            label.style(f"color: {SUCCESS_COLOR};")
             label.text = "Setting revised"
 
             label = _progress("Revising characters...")
@@ -401,7 +402,7 @@ class CreatorWizard:
                 self._client,
                 self._config,
             )
-            label.style("color: #69f0ae;")
+            label.style(f"color: {SUCCESS_COLOR};")
             label.text = "Characters revised"
 
             label = _progress("Revising chapters...")
@@ -413,7 +414,7 @@ class CreatorWizard:
                 self._client,
                 self._config,
             )
-            label.style("color: #69f0ae;")
+            label.style(f"color: {SUCCESS_COLOR};")
             label.text = "Chapters revised"
 
             self._proposal = assemble_proposal(
@@ -426,7 +427,7 @@ class CreatorWizard:
         except Exception as e:
             logger.exception("Proposal revision failed")
             with progress_container:
-                ui.label(f"Revision failed: {e}").style("color: #ff5252;")
+                ui.label(f"Revision failed: {e}").style(f"color: {ERROR_COLOR};")
 
     # ------------------------------------------------------------------
     # Step 3: Generation
@@ -482,7 +483,7 @@ class CreatorWizard:
             # Mark previous label as complete
             if len(progress_labels) > 1:
                 prev = progress_labels[-2]
-                prev.style("color: #69f0ae;")
+                prev.style(f"color: {SUCCESS_COLOR};")
 
         try:
             self._generated_data = await run_generation_pipeline(
@@ -494,7 +495,7 @@ class CreatorWizard:
 
             # Mark final progress label as complete
             if progress_labels:
-                progress_labels[-1].style("color: #69f0ae;")
+                progress_labels[-1].style(f"color: {SUCCESS_COLOR};")
 
             # Validate
             await self._run_validation(val_container)
@@ -502,7 +503,7 @@ class CreatorWizard:
         except Exception as e:
             logger.exception("Generation failed")
             with gen_container:
-                ui.label(f"Generation failed: {e}").style("color: #ff5252;")
+                ui.label(f"Generation failed: {e}").style(f"color: {ERROR_COLOR};")
                 ui.button("Retry", on_click=self._gen_trigger, icon="refresh").props(
                     "outline"
                 )
@@ -522,10 +523,10 @@ class CreatorWizard:
                 ui.label(
                     f"Validation found {len(result.errors)} error(s). "
                     "Attempting auto-fix..."
-                ).style("color: #ff9800;")
+                ).style(f"color: {WARNING_COLOR};")
                 for err in result.errors:
                     ui.label(f"  {err.file}: {err.message}").style(
-                        "color: #ff9800; font-size: 0.85em; margin-left: 12px;"
+                        f"color: {WARNING_COLOR}; font-size: 0.85em; margin-left: 12px;"
                     )
 
             self._generated_data, result = await fix_validation_errors(
@@ -538,15 +539,15 @@ class CreatorWizard:
         with container:
             if result.valid:
                 ui.label("Validation passed.").style(
-                    "color: #69f0ae; font-weight: bold;"
+                    f"color: {SUCCESS_COLOR}; font-weight: bold;"
                 )
             else:
                 ui.label("Validation errors remain after auto-fix:").style(
-                    "color: #ff5252; font-weight: bold;"
+                    f"color: {ERROR_COLOR}; font-weight: bold;"
                 )
                 for err in result.errors:
                     ui.label(f"  {err.file}: {err.message}").style(
-                        "color: #ff5252; font-size: 0.85em; margin-left: 12px;"
+                        f"color: {ERROR_COLOR}; font-size: 0.85em; margin-left: 12px;"
                     )
 
             # Size warnings
@@ -556,11 +557,11 @@ class CreatorWizard:
                 )
                 if warnings:
                     ui.label("Size warnings:").style(
-                        "color: #ff9800; font-weight: bold; margin-top: 8px;"
+                        f"color: {WARNING_COLOR}; font-weight: bold; margin-top: 8px;"
                     )
                     for w in warnings:
                         ui.label(f"  {w}").style(
-                            "color: #ff9800; font-size: 0.85em; margin-left: 12px;"
+                            f"color: {WARNING_COLOR}; font-size: 0.85em; margin-left: 12px;"
                         )
 
     # ------------------------------------------------------------------
@@ -808,7 +809,7 @@ class CreatorWizard:
             self._generated_data = await revise_targeted(
                 self._generated_data, feedback, self._client, self._config
             )
-            label.style("color: #69f0ae;")
+            label.style(f"color: {SUCCESS_COLOR};")
             label.text = "Files revised"
 
             label = _progress("Validating...")
@@ -819,7 +820,7 @@ class CreatorWizard:
                     self._generated_data, result, self._client, self._config
                 )
             self._validation_result = result
-            label.style("color: #69f0ae;")
+            label.style(f"color: {SUCCESS_COLOR};")
             label.text = "Validation complete"
 
             progress_container.clear()
@@ -835,7 +836,7 @@ class CreatorWizard:
         except Exception as e:
             logger.exception("Revision failed")
             with progress_container:
-                ui.label(f"Revision failed: {e}").style("color: #ff5252;")
+                ui.label(f"Revision failed: {e}").style(f"color: {ERROR_COLOR};")
 
     async def _write_game(self, container: ui.element) -> None:
         """Write the game files to disk."""
@@ -899,11 +900,11 @@ class CreatorWizard:
     def _build_config_error(self, message: str) -> None:
         """Show a helpful message when creator config is missing."""
         with ui.column().classes("w-full max-w-3xl mx-auto p-4 items-center"):
-            ui.icon("warning", size="xl").style("color: #ff9800;")
+            ui.icon("warning", size="xl").style(f"color: {WARNING_COLOR};")
             ui.label("Creator Not Configured").style(
                 "font-size: 1.2em; font-weight: bold; color: #ccc;"
             )
-            ui.label(message).style("color: #ff9800;")
+            ui.label(message).style(f"color: {WARNING_COLOR};")
             ui.label(
                 "The game creator requires an LLM API key. "
                 "Set CREATOR_API_KEY (or LLM_API_KEY) in your .env file. "

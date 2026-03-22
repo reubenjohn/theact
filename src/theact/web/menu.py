@@ -26,6 +26,7 @@ from theact.io.save_manager import (
 )
 from theact.versioning import git_save
 from theact.web.components.html_utils import relative_time
+from theact.web.styles import ERROR_COLOR, INFO_COLOR, SUCCESS_COLOR
 
 logger = logging.getLogger(__name__)
 
@@ -231,18 +232,22 @@ class MenuBuilder:
                     ui.button(
                         icon="folder_open",
                         on_click=make_load_handler(save_id),
-                    ).props("flat dense").style("color: #69f0ae;").tooltip("Load")
+                    ).props("flat dense").style(f"color: {SUCCESS_COLOR};").tooltip(
+                        "Load"
+                    )
 
                     save_path = SAVES_DIR / save_id
                     ui.button(
                         icon="call_split",
                         on_click=make_fork_handler(save_id, save_path),
-                    ).props("flat dense").style("color: #42a5f5;").tooltip("Fork")
+                    ).props("flat dense").style(f"color: {INFO_COLOR};").tooltip("Fork")
 
                     ui.button(
                         icon="delete",
                         on_click=make_delete_handler(save_id),
-                    ).props("flat dense").style("color: #ff5252;").tooltip("Delete")
+                    ).props("flat dense").style(f"color: {ERROR_COLOR};").tooltip(
+                        "Delete"
+                    )
 
 
 def _show_fork_dialog(save_id: str, save_path: Path) -> None:
@@ -275,7 +280,7 @@ def _show_fork_dialog(save_id: str, save_path: Path) -> None:
 
             ui.button("Fork", on_click=confirm_fork, icon="call_split").props(
                 "flat"
-            ).style("color: #42a5f5;")
+            ).style(f"color: {INFO_COLOR};")
     dialog.open()
 
 
@@ -283,7 +288,9 @@ def _show_delete_dialog(save_id: str) -> None:
     """Show a confirmation dialog to delete a save."""
     with ui.dialog() as dialog, ui.card():
         ui.label(f'Delete save "{save_id}"?').style("color: #ccc; font-weight: bold;")
-        ui.label("This cannot be undone.").style("color: #ff5252; font-size: 0.85em;")
+        ui.label("This cannot be undone.").style(
+            f"color: {ERROR_COLOR}; font-size: 0.85em;"
+        )
 
         with ui.row().classes("justify-end gap-2"):
             ui.button("Cancel", on_click=dialog.close).props("flat")
