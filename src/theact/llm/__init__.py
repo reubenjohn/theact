@@ -23,8 +23,10 @@ from theact.llm.inference import (
     Message,
     complete,
     complete_structured,
+    extract_think_tags,
     stream,
     stream_structured,
+    strip_think_tags,
 )
 from theact.llm.parsing import (
     YAMLParseError,
@@ -70,6 +72,8 @@ __all__ = [
     "stream",
     "complete_structured",
     "stream_structured",
+    "extract_think_tags",
+    "strip_think_tags",
     # Result types
     "LLMResult",
     "StreamChunk",

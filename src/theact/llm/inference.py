@@ -66,7 +66,7 @@ async def _call_api(
         raise LLMResponseError(f"API error {e.status_code}: {e.message}") from e
 
 
-def _extract_think_tags(content: str) -> tuple[str, str]:
+def extract_think_tags(content: str) -> tuple[str, str]:
     """Extract <think>...</think> content from a string.
 
     Returns (clean_content, thinking_text).
@@ -79,6 +79,12 @@ def _extract_think_tags(content: str) -> tuple[str, str]:
 
     clean = re.sub(r"<think>(.*?)</think>", _collect, content, flags=re.DOTALL)
     return clean.strip(), "\n".join(thinking_parts)
+
+
+def strip_think_tags(text: str) -> str:
+    """Remove <think>...</think> tags from text, keeping surrounding content."""
+    clean, _ = extract_think_tags(text)
+    return clean
 
 
 async def complete(
@@ -108,7 +114,7 @@ async def complete(
 
     # Also parse <think>...</think> tags from content
     if "<think>" in content:
-        content, tag_thinking = _extract_think_tags(content)
+        content, tag_thinking = extract_think_tags(content)
         if tag_thinking:
             thinking = (thinking + "\n" + tag_thinking).strip()
 

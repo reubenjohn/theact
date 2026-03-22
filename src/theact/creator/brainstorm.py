@@ -9,6 +9,7 @@ from openai import AsyncOpenAI
 from theact.creator.config import CreatorLLMConfig
 from theact.creator.generator import call_llm
 from theact.creator.prompts import BRAINSTORM_SUMMARIZE_SYSTEM, BRAINSTORM_SYSTEM
+from theact.llm.tokens import estimate_tokens
 
 console = Console()
 
@@ -20,11 +21,6 @@ def _get_input(prompt: str = "> ") -> str | None:
     except (EOFError, KeyboardInterrupt):
         console.print("\n[dim]Aborted.[/dim]")
         return None
-
-
-def _estimate_tokens(text: str) -> int:
-    """Rough token estimate: len(text) // 4."""
-    return len(text) // 4
 
 
 class BrainstormSession:
@@ -93,7 +89,7 @@ class BrainstormSession:
 
     def _truncate_if_needed(self) -> None:
         """Sliding window truncation if context exceeds token budget."""
-        total = sum(_estimate_tokens(m["content"]) for m in self.messages)
+        total = sum(estimate_tokens(m["content"]) for m in self.messages)
         if total <= self.MAX_CONTEXT_TOKENS:
             return
 

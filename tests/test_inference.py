@@ -12,7 +12,7 @@ from theact.llm.config import AgentLLMConfig, LLMConfig
 from theact.llm.errors import LLMConnectionError, LLMRateLimitError, LLMResponseError
 from theact.llm.inference import (
     _call_api,
-    _extract_think_tags,
+    extract_think_tags,
     complete,
     complete_structured,
     stream,
@@ -24,17 +24,17 @@ from theact.llm.streaming import LLMResult, StreamChunk, StructuredResult
 
 class TestExtractThinkTags:
     def test_no_tags(self):
-        content, thinking = _extract_think_tags("Hello world")
+        content, thinking = extract_think_tags("Hello world")
         assert content == "Hello world"
         assert thinking == ""
 
     def test_single_tag(self):
-        content, thinking = _extract_think_tags("Before<think>reasoning</think>After")
+        content, thinking = extract_think_tags("Before<think>reasoning</think>After")
         assert content == "BeforeAfter"
         assert thinking == "reasoning"
 
     def test_multiple_tags(self):
-        content, thinking = _extract_think_tags(
+        content, thinking = extract_think_tags(
             "<think>first</think>Middle<think>second</think>End"
         )
         assert content == "MiddleEnd"
@@ -42,7 +42,7 @@ class TestExtractThinkTags:
         assert "second" in thinking
 
     def test_multiline_think(self):
-        content, thinking = _extract_think_tags(
+        content, thinking = extract_think_tags(
             "<think>line1\nline2\nline3</think>Result"
         )
         assert content == "Result"
@@ -50,7 +50,7 @@ class TestExtractThinkTags:
         assert "line3" in thinking
 
     def test_only_think_tags(self):
-        content, thinking = _extract_think_tags("<think>only thinking</think>")
+        content, thinking = extract_think_tags("<think>only thinking</think>")
         assert content == ""
         assert thinking == "only thinking"
 

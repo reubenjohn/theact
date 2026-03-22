@@ -9,6 +9,7 @@ from openai import AsyncOpenAI
 
 from theact.creator.config import CreatorLLMConfig
 from theact.creator.prompts import GENERATION_SYSTEM, GENERATION_USER
+from theact.llm.inference import strip_think_tags
 
 
 class YAMLParseError(Exception):
@@ -40,7 +41,7 @@ async def call_llm(
 
     # Detect truncation with no usable content (common with thinking models
     # that spend the entire token budget on internal reasoning)
-    if choice.finish_reason == "length" and not _strip_think_tags(text).strip():
+    if choice.finish_reason == "length" and not strip_think_tags(text).strip():
         raise YAMLParseError(
             f"Model response was truncated (max_tokens={budget} exhausted) "
             "with no YAML content produced. The model likely spent the entire "
@@ -58,18 +59,13 @@ def serialize_game_data(data: dict) -> str:
     )
 
 
-def _strip_think_tags(text: str) -> str:
-    """Remove <think>...</think> tags from text, keeping surrounding content."""
-    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
-
-
 def extract_yaml(response_text: str) -> dict:
     """Extract YAML from an LLM response, handling fenced or raw YAML.
 
     Strips <think>...</think> tags before parsing.
     Returns the parsed dict. Raises YAMLParseError on failure.
     """
-    cleaned = _strip_think_tags(response_text)
+    cleaned = strip_think_tags(response_text)
 
     if not cleaned.strip():
         if response_text.strip():

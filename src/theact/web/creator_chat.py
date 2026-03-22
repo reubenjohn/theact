@@ -9,7 +9,6 @@ summary of the conversation into the concept or feedback fields.
 from __future__ import annotations
 
 import logging
-import re
 
 from openai import AsyncOpenAI
 
@@ -18,23 +17,10 @@ from nicegui import ui
 from theact.creator.config import CreatorLLMConfig
 from theact.creator.generator import call_llm
 from theact.creator.prompts import BRAINSTORM_SUMMARIZE_SYSTEM, BRAINSTORM_SYSTEM
+from theact.llm.inference import extract_think_tags
+from theact.llm.tokens import estimate_tokens
 
 logger = logging.getLogger(__name__)
-
-# Rough token estimate matching the rest of the codebase.
-_TOKEN_EST = 4  # chars per token
-
-_THINK_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
-
-
-def _split_thinking(text: str) -> tuple[str | None, str]:
-    """Extract thinking block from response, return (thinking, reply)."""
-    match = _THINK_RE.search(text)
-    if not match:
-        return None, text
-    thinking = match.group(1).strip()
-    reply = _THINK_RE.sub("", text).strip()
-    return (thinking or None), reply
 
 
 class CreatorChatPanel:
@@ -160,9 +146,12 @@ class CreatorChatPanel:
             response = await call_llm(self._client, self._config, self._messages)
             self._messages.append({"role": "assistant", "content": response})
             thinking.delete()
-            think_text, reply_text = _split_thinking(response)
+            reply_text, think_text = extract_think_tags(response)
             self._render_message(
-                "Designer", reply_text, user=False, thinking=think_text
+                "Designer",
+                reply_text,
+                user=False,
+                thinking=think_text or None,
             )
         except Exception as e:
             logger.exception("Chat message failed")
@@ -268,7 +257,7 @@ class CreatorChatPanel:
 
     def _truncate_if_needed(self) -> None:
         """Sliding window truncation when context exceeds budget."""
-        total = sum(len(m["content"]) // _TOKEN_EST for m in self._messages)
+        total = sum(estimate_tokens(m["content"]) for m in self._messages)
         if total <= self.MAX_CONTEXT_TOKENS:
             return
         system = self._messages[:1]
