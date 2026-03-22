@@ -74,6 +74,7 @@ class PlaytestRunner:
                 player_input="",
                 llm_config=self.config.llm_config,
                 call_log=self.call_log,
+                debug=self.config.debug,
             )
             self.logger.log_turn_result(
                 0, opening_result, time.monotonic() - turn_start
@@ -115,6 +116,7 @@ class PlaytestRunner:
                     player_input,
                     llm_config=self.config.llm_config,
                     call_log=self.call_log,
+                    debug=self.config.debug,
                 )
 
                 elapsed = time.monotonic() - turn_start

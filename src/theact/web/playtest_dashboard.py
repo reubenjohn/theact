@@ -144,6 +144,7 @@ def _build_config_panel(
     ui.label().bind_text_from(edge_case_slider, "value", backward=lambda v: f"{v:.0%}")
 
     stop_on_error_check = ui.checkbox("Stop on error", value=False)
+    debug_check = ui.checkbox("Write diagnostics", value=True)
 
     start_btn = (
         ui.button(
@@ -155,6 +156,7 @@ def _build_config_panel(
                 player_name=player_name_input.value or "Alex",
                 edge_case_frequency=edge_case_slider.value,
                 stop_on_error=stop_on_error_check.value,
+                debug=debug_check.value,
                 render_progress_fn=render_progress_fn,
                 render_results_fn=render_results_fn,
                 refresh_reports_fn=refresh_reports_fn,
@@ -175,6 +177,7 @@ async def _start_playtest(
     player_name: str,
     edge_case_frequency: float,
     stop_on_error: bool,
+    debug: bool,
     render_progress_fn,
     render_results_fn,
     refresh_reports_fn,
@@ -200,6 +203,7 @@ async def _start_playtest(
         player_name=player_name,
         edge_case_frequency=edge_case_frequency,
         stop_on_error=stop_on_error,
+        debug=debug,
         llm_config=llm_config,
     )
 

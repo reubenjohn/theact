@@ -111,3 +111,19 @@ def test_display_preferences_defaults(tmp_path, monkeypatch):
     assert loaded.default_show_thinking is False
     assert loaded.font_size == "medium"
     assert loaded.density == "comfortable"
+    assert loaded.debug_mode is False
+
+
+def test_debug_mode_persisted(tmp_path, monkeypatch):
+    """debug_mode survives a save/load cycle."""
+    settings_file = tmp_path / "settings.yaml"
+    monkeypatch.setattr("theact.io.settings_store.SETTINGS_FILE", settings_file)
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+
+    original = SettingsData(debug_mode=True)
+    save_settings(original)
+
+    loaded = load_settings()
+    assert loaded.debug_mode is True

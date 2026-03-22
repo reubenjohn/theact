@@ -40,6 +40,11 @@ def main() -> None:
         help="Frequency of edge case actions (0.0 to 1.0)",
     )
     parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Write per-turn diagnostics artifacts",
+    )
+    parser.add_argument(
         "--report-dir",
         default="playtests",
         help="Base directory for playtest reports",
@@ -75,6 +80,7 @@ def main() -> None:
         timestamp=timestamp,
         llm_config=llm_config,
         output_dir=args.report_dir,
+        debug=args.debug,
     )
 
     print(f"Starting playtest: game={config.game_id}, turns={config.max_turns}")

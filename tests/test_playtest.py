@@ -77,6 +77,14 @@ class TestPlaytestConfig:
         assert config.repeat_frequency == 0.03
         assert config.timestamp != ""  # auto-filled
 
+    def test_debug_defaults_false(self):
+        config = PlaytestConfig(game_id="test")
+        assert config.debug is False
+
+    def test_debug_can_be_enabled(self):
+        config = PlaytestConfig(game_id="test", debug=True)
+        assert config.debug is True
+
     def test_custom_timestamp_preserved(self):
         config = PlaytestConfig(game_id="test", timestamp="2026-01-01T00-00-00")
         assert config.timestamp == "2026-01-01T00-00-00"

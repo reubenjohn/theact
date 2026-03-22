@@ -11,9 +11,11 @@ import logging
 from dotenv import load_dotenv
 from nicegui import ui
 
+from theact.io.settings_store import load_settings
 from theact.llm.config import load_llm_config
 from theact.web.menu import MenuBuilder
 from theact.web.session import GameplaySession
+from theact.web.state import GameSessionState
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +59,14 @@ def setup_app() -> None:
             page_state["gameplay_container"].set_visibility(True)
             page_state["gameplay_container"].clear()
 
-            session = GameplaySession(
+            settings = load_settings()
+            state = GameSessionState(
                 game=game,
                 llm_config=llm_config,
+                debug_mode=settings.debug_mode,
+            )
+            session = GameplaySession(
+                state=state,
                 on_quit=return_to_menu,
             )
             page_state["session"] = session

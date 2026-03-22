@@ -24,6 +24,7 @@ class PlaytestConfig:
     timestamp: str = ""  # auto-filled if empty
     llm_config: LLMConfig = field(default_factory=LLMConfig)
     output_dir: str = "playtests"  # base output directory
+    debug: bool = False  # write per-turn diagnostics artifacts
 
     def __post_init__(self) -> None:
         if not self.timestamp:

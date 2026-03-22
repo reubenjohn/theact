@@ -51,6 +51,9 @@ class SettingsData:
     font_size: str = "medium"  # small | medium | large
     density: str = "comfortable"  # compact | comfortable
 
+    # Debug / diagnostics
+    debug_mode: bool = False  # write per-turn diagnostics artifacts
+
 
 def load_settings() -> SettingsData:
     """Load settings from settings.yaml, falling back to env vars.

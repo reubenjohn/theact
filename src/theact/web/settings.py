@@ -280,6 +280,18 @@ def _build_display_section(settings: SettingsData) -> dict:
             value=settings.density,
         )
 
+        ui.separator()
+
+        # Debug / diagnostics
+        fields["debug_mode"] = ui.switch(
+            "Write diagnostics each turn",
+            value=settings.debug_mode,
+        )
+        ui.label(
+            "Writes per-agent prompts, responses, and parsed output "
+            "to diagnostics/turn-NNN/ in the save directory."
+        ).style("color: #888; font-size: 0.8em;")
+
     return fields
 
 
@@ -301,4 +313,5 @@ def _collect_form_values(
         default_show_thinking=display_fields["show_thinking"].value,
         font_size=display_fields["font_size"].value or "medium",
         density=display_fields["density"].value or "comfortable",
+        debug_mode=display_fields["debug_mode"].value,
     )

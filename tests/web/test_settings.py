@@ -85,6 +85,11 @@ class TestDisplayPreferences:
         expect(page.get_by_text("Chat Font Size")).to_be_visible()
         expect(page.get_by_text("Message Density")).to_be_visible()
 
+    def test_diagnostics_toggle_present(self, page, web_server):
+        """Write diagnostics toggle is present in display preferences."""
+        page.goto(f"{web_server}/settings")
+        expect(page.get_by_text("Write diagnostics each turn")).to_be_visible()
+
 
 class TestMenuSettingsLink:
     """Tests for the settings link on the menu page."""

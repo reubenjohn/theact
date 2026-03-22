@@ -52,6 +52,11 @@ class TestPlaytestConfigForm:
         page.goto(f"{web_server}/playtest")
         expect(page.get_by_text("Stop on error")).to_be_visible()
 
+    def test_write_diagnostics_checkbox_present(self, page, web_server):
+        """Write diagnostics checkbox is present and checked by default."""
+        page.goto(f"{web_server}/playtest")
+        expect(page.get_by_text("Write diagnostics")).to_be_visible()
+
     def test_start_button_present(self, page, web_server):
         """Start Playtest button is present."""
         page.goto(f"{web_server}/playtest")
