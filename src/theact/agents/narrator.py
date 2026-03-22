@@ -39,9 +39,9 @@ async def run_narrator(
     t0 = time.monotonic()
 
     yaml_hint = (
-        "narration: |\\n  ...\\n"
         "responding_characters:\\n  - ...\\n"
-        "mood: tense|calm|urgent|mysterious|humorous|dramatic|melancholic"
+        "mood: tense|calm|urgent|mysterious|humorous|dramatic|melancholic\\n"
+        "narration: |\\n  ..."
     )
     raw_content = ""
     retried = False

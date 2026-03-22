@@ -31,37 +31,40 @@ class AgentLLMConfig:
 
 # Sensible defaults for each agent type.
 # NOTE: This is a thinking model — thinking tokens count against max_tokens.
-# Budget must include ~500-1500 tokens for reasoning PLUS the actual content.
+# Budget must include ~1000-2000 tokens for reasoning PLUS the actual content.
+# Observed thinking usage on GLM 4.7 Flash Heretic:
+#   narrator ~1500-2000, character ~1000-1500, memory ~800, game_state ~600,
+#   summarizer ~500, player agent ~500.
 NARRATOR_CONFIG = AgentLLMConfig(
     temperature=1.0,
-    max_tokens=2000,
+    max_tokens=4096,
     structured=True,
     max_retries=2,
 )
 
 CHARACTER_CONFIG = AgentLLMConfig(
     temperature=1.0,
-    max_tokens=1500,
+    max_tokens=3000,
     structured=False,
 )
 
 MEMORY_UPDATE_CONFIG = AgentLLMConfig(
     temperature=0.2,
-    max_tokens=1500,
+    max_tokens=2500,
     structured=True,
     max_retries=2,
 )
 
 GAME_STATE_CONFIG = AgentLLMConfig(
     temperature=0.2,
-    max_tokens=800,
+    max_tokens=2000,
     structured=True,
     max_retries=2,
 )
 
 SUMMARIZER_CONFIG = AgentLLMConfig(
     temperature=0.3,
-    max_tokens=1000,
+    max_tokens=1500,
     structured=False,
 )
 

@@ -154,7 +154,7 @@ async def diagnose_character(args, game, llm_config):
     from theact.models.memory import CharacterMemory
 
     if not memory:
-        memory = CharacterMemory(summary="", key_facts=[])
+        memory = CharacterMemory(character=character.name, summary="", key_facts=[])
 
     from theact.engine.types import NarratorOutput
 
@@ -182,7 +182,9 @@ async def diagnose_memory(args, game, llm_config):
 
     from theact.models.memory import CharacterMemory
 
-    memory = game.memories.get(char_id) or CharacterMemory(summary="", key_facts=[])
+    memory = game.memories.get(char_id) or CharacterMemory(
+        character=character.name, summary="", key_facts=[]
+    )
     turn_entries = [
         ConversationEntry(
             turn=1,

@@ -26,21 +26,22 @@ YOUR TASK:
 2. Pick which characters respond. If the player is near a character or their action relates to a character, include that character. Include at least one character if any are nearby or relevant. Only omit all characters if the player is truly alone with no one in earshot.
 3. Guide the story toward unfinished beats. Do NOT skip beats.
 
-Output a YAML block. Use character IDs (not names) in responding_characters:
+Output a YAML block. Put responding_characters and mood FIRST, narration LAST:
 
 ```yaml
-narration: |
-  You step into the clearing. The air smells wrong — metallic,
-  like a storm that never came. Something crunches under your boot.
 responding_characters:
   - maya
   - joaquin
 mood: tense
+narration: |
+  You step into the clearing. The air smells wrong — metallic,
+  like a storm that never came. Something crunches under your boot.
 ```
 
 OUTPUT RULES:
 - responding_characters uses IDs from ACTIVE CHARACTERS.
 - mood is one of: tense, calm, urgent, mysterious, humorous, dramatic, melancholic.
+- narration must be the last field in the YAML block.
 - Never speak for the player. Never decide what the player does next."""
 
 # ─── CHARACTER ───────────────────────────────────────────────────────────

@@ -60,28 +60,28 @@ class TestAgentLLMConfig:
 class TestAgentDefaults:
     def test_narrator_config(self):
         assert NARRATOR_CONFIG.temperature == 1.0
-        assert NARRATOR_CONFIG.max_tokens == 2000
+        assert NARRATOR_CONFIG.max_tokens == 4096
         assert NARRATOR_CONFIG.structured is True
         assert NARRATOR_CONFIG.max_retries == 2
 
     def test_character_config(self):
         assert CHARACTER_CONFIG.temperature == 1.0
-        assert CHARACTER_CONFIG.max_tokens == 1500
+        assert CHARACTER_CONFIG.max_tokens == 3000
         assert CHARACTER_CONFIG.structured is False
 
     def test_memory_update_config(self):
         assert MEMORY_UPDATE_CONFIG.temperature == 0.2
-        assert MEMORY_UPDATE_CONFIG.max_tokens == 1500
+        assert MEMORY_UPDATE_CONFIG.max_tokens == 2500
         assert MEMORY_UPDATE_CONFIG.structured is True
 
     def test_game_state_config(self):
         assert GAME_STATE_CONFIG.temperature == 0.2
-        assert GAME_STATE_CONFIG.max_tokens == 800
+        assert GAME_STATE_CONFIG.max_tokens == 2000
         assert GAME_STATE_CONFIG.structured is True
 
     def test_summarizer_config(self):
         assert SUMMARIZER_CONFIG.temperature == 0.3
-        assert SUMMARIZER_CONFIG.max_tokens == 1000
+        assert SUMMARIZER_CONFIG.max_tokens == 1500
         assert SUMMARIZER_CONFIG.structured is False
 
 

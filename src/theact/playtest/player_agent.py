@@ -74,7 +74,7 @@ DIRECT_INJECTION_ALL = (
 
 PLAYER_AGENT_CONFIG = AgentLLMConfig(
     temperature=0.9,
-    max_tokens=150,
+    max_tokens=1500,
     structured=False,
 )
 
@@ -201,5 +201,18 @@ class PlayerAgent:
         )
 
         action = result.content.strip()
+
+        # Fallback: if thinking model consumed all tokens, use a generic action
+        if not action:
+            action = random.choice(
+                [
+                    "I look around for anything useful.",
+                    "I try talking to the nearest person.",
+                    "I explore the area more carefully.",
+                    "I search for supplies.",
+                    "I investigate the strange detail I noticed.",
+                ]
+            )
+
         self._last_action = action
         return PlayerDecision(action=action, edge_case_type=edge_case_type)
