@@ -28,13 +28,27 @@ async def call_llm(
             to select per-type max_tokens via config.max_tokens_for().
             When None, uses config.max_tokens.
     """
+    budget = config.max_tokens_for(call_type) if call_type else config.max_tokens
     response = await client.chat.completions.create(
         model=config.model,
         messages=messages,
         temperature=config.temperature,
-        max_tokens=config.max_tokens_for(call_type) if call_type else config.max_tokens,
+        max_tokens=budget,
     )
-    return response.choices[0].message.content or ""
+    choice = response.choices[0]
+    text = choice.message.content or ""
+
+    # Detect truncation with no usable content (common with thinking models
+    # that spend the entire token budget on internal reasoning)
+    if choice.finish_reason == "length" and not _strip_think_tags(text).strip():
+        raise YAMLParseError(
+            f"Model response was truncated (max_tokens={budget} exhausted) "
+            "with no YAML content produced. The model likely spent the entire "
+            "token budget on internal reasoning. Increase max_tokens in "
+            "creator settings."
+        )
+
+    return text
 
 
 def serialize_game_data(data: dict) -> str:
@@ -56,6 +70,15 @@ def extract_yaml(response_text: str) -> dict:
     Returns the parsed dict. Raises YAMLParseError on failure.
     """
     cleaned = _strip_think_tags(response_text)
+
+    if not cleaned.strip():
+        if response_text.strip():
+            raise YAMLParseError(
+                "Model response contained only reasoning/thinking content "
+                "with no YAML output. If using a thinking model, try "
+                "increasing max_tokens in creator settings."
+            )
+        raise YAMLParseError("Model returned an empty response.")
 
     # Try to match a fully-fenced block first
     match = re.search(r"```(?:yaml)?\s*\n(.*?)```", cleaned, re.DOTALL)

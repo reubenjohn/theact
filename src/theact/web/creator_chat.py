@@ -55,8 +55,7 @@ class CreatorChatPanel:
         self._drawer = (
             ui.right_drawer(value=False, fixed=False, bordered=True)
             .classes("bg-[#0d1117]")
-            .style("width: min(540px, 40vw);")
-            .props('data-testid="creator-chat-drawer"')
+            .props(':width="540" data-testid="creator-chat-drawer"')
         )
 
         with self._drawer:
