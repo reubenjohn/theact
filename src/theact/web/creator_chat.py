@@ -47,13 +47,15 @@ class CreatorChatPanel:
         self._chat_container: ui.column | None = None
         self._input: ui.input | None = None
         self._sending = False
+        # Track UI bubble containers so we can remove them on undo/clear.
+        self._bubble_elements: list[ui.column] = []
 
     def build(self) -> None:
         """Build the right-drawer chat panel."""
         self._drawer = (
             ui.right_drawer(value=False, fixed=False, bordered=True)
             .classes("bg-[#0d1117]")
-            .style("width: 380px;")
+            .style("width: min(540px, 40vw);")
             .props('data-testid="creator-chat-drawer"')
         )
 
@@ -68,6 +70,14 @@ class CreatorChatPanel:
                         icon="content_paste",
                         on_click=self._use_as_concept,
                     ).props("flat dense").tooltip("Use summary as concept")
+                    ui.button(
+                        icon="undo",
+                        on_click=self._undo_last,
+                    ).props("flat dense").tooltip("Undo last message")
+                    ui.button(
+                        icon="delete_sweep",
+                        on_click=self._clear_chat,
+                    ).props("flat dense").tooltip("Clear chat")
                     ui.button(
                         icon="close",
                         on_click=self.toggle,
@@ -154,7 +164,9 @@ class CreatorChatPanel:
             bg = "#1a2233" if user else "#1a1a2e"
             color = "#90caf9" if user else "#c5e1a5"
 
-            with ui.column().classes(f"w-full {align}"):
+            bubble = ui.column().classes(f"w-full {align}")
+            self._bubble_elements.append(bubble)
+            with bubble:
                 ui.label(sender).style(
                     f"color: {color}; font-size: 0.75em; font-weight: bold;"
                 )
@@ -170,6 +182,32 @@ class CreatorChatPanel:
                 'document.querySelector("[data-testid=creator-chat-drawer] '
                 '.overflow-y-auto").scrollTop = 999999;'
             )
+
+    def _undo_last(self) -> None:
+        """Remove the last user+assistant exchange from history and UI."""
+        if self._sending or len(self._messages) <= 1:
+            return
+        # Remove last assistant reply (if present) then user message.
+        removed = 0
+        while len(self._messages) > 1 and removed < 2:
+            role = self._messages[-1]["role"]
+            self._messages.pop()
+            if self._bubble_elements:
+                self._bubble_elements.pop().delete()
+            removed += 1
+            if role == "user":
+                break
+        ui.notify("Last message undone.", type="info")
+
+    def _clear_chat(self) -> None:
+        """Reset conversation to a blank slate."""
+        if self._sending:
+            return
+        self._messages = [self._messages[0]]  # keep system prompt
+        self._bubble_elements.clear()
+        if self._chat_container:
+            self._chat_container.clear()
+        ui.notify("Chat cleared.", type="info")
 
     async def _use_as_concept(self) -> None:
         """Summarize the conversation and pass it to the wizard."""
@@ -211,5 +249,8 @@ class CreatorChatPanel:
         rest = self._messages[1:]
         keep_count = self.KEEP_EXCHANGES * 2
         if len(rest) > keep_count:
+            drop_count = len(rest) - keep_count
             rest = rest[-keep_count:]
+            # Keep bubble list in sync — drop the oldest UI elements.
+            self._bubble_elements = self._bubble_elements[drop_count:]
         self._messages = system + rest

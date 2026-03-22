@@ -106,3 +106,82 @@ class TestChatPanelSummarize:
         user_msg = captured_messages[0][-1]["content"]
         assert "User: noir game" in user_msg
         assert "Designer: cool idea" in user_msg
+
+
+class TestChatPanelUndoAndClear:
+    """Test the undo and clear operations."""
+
+    def _panel_with_exchange(self):
+        """Create a panel with one user+assistant exchange."""
+        from theact.web.creator_chat import CreatorChatPanel
+
+        panel = CreatorChatPanel(client=AsyncMock(), config=_config(), on_use_text=None)
+        panel._messages.append({"role": "user", "content": "hello"})
+        panel._messages.append({"role": "assistant", "content": "hi there"})
+        # Simulate bubble elements (mocks with .delete())
+        panel._bubble_elements.append(MagicMock())
+        panel._bubble_elements.append(MagicMock())
+        return panel
+
+    def test_undo_removes_user_and_assistant(self):
+        panel = self._panel_with_exchange()
+        assert len(panel._messages) == 3  # system + user + assistant
+        panel._undo_last()
+        # Only system prompt remains
+        assert len(panel._messages) == 1
+        assert panel._messages[0]["role"] == "system"
+        assert len(panel._bubble_elements) == 0
+
+    def test_undo_removes_only_user_when_no_assistant(self):
+        from theact.web.creator_chat import CreatorChatPanel
+
+        panel = CreatorChatPanel(client=AsyncMock(), config=_config(), on_use_text=None)
+        panel._messages.append({"role": "user", "content": "hello"})
+        panel._bubble_elements.append(MagicMock())
+        panel._undo_last()
+        assert len(panel._messages) == 1
+        assert len(panel._bubble_elements) == 0
+
+    def test_undo_noop_on_empty_chat(self):
+        from theact.web.creator_chat import CreatorChatPanel
+
+        panel = CreatorChatPanel(client=AsyncMock(), config=_config(), on_use_text=None)
+        panel._undo_last()  # should not raise
+        assert len(panel._messages) == 1
+
+    def test_undo_blocked_while_sending(self):
+        panel = self._panel_with_exchange()
+        panel._sending = True
+        panel._undo_last()
+        assert len(panel._messages) == 3  # unchanged
+
+    def test_clear_resets_to_system_only(self):
+        panel = self._panel_with_exchange()
+        panel._chat_container = MagicMock()
+        panel._clear_chat()
+        assert len(panel._messages) == 1
+        assert panel._messages[0]["role"] == "system"
+        assert len(panel._bubble_elements) == 0
+        panel._chat_container.clear.assert_called_once()
+
+    def test_clear_blocked_while_sending(self):
+        panel = self._panel_with_exchange()
+        panel._sending = True
+        panel._clear_chat()
+        assert len(panel._messages) == 3  # unchanged
+
+    def test_truncation_keeps_bubbles_in_sync(self):
+        from theact.web.creator_chat import CreatorChatPanel
+
+        panel = CreatorChatPanel(client=AsyncMock(), config=_config(), on_use_text=None)
+        for i in range(30):
+            panel._messages.append({"role": "user", "content": f"msg {i} " * 100})
+            panel._messages.append(
+                {"role": "assistant", "content": f"reply {i} " * 100}
+            )
+            panel._bubble_elements.append(MagicMock())
+            panel._bubble_elements.append(MagicMock())
+
+        panel._truncate_if_needed()
+        non_system = len(panel._messages) - 1
+        assert len(panel._bubble_elements) == non_system
