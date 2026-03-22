@@ -19,6 +19,7 @@ from theact.playtest.report import (
     generate_report,
     write_report,
 )
+from theact.agents.prompts import MAX_KEY_FACTS
 from theact.playtest.scoring import score_turn
 
 logger = logging.getLogger(__name__)
@@ -167,9 +168,11 @@ class PlaytestRunner:
 
         # Collect final memory state
         memory_final: dict[str, str] = {}
+        memory_final_facts: dict[str, list[str]] = {}
         if self.logger.turns:
             last_turn = self.logger.turns[-1]
             memory_final = dict(last_turn.memory_updates)
+            memory_final_facts = dict(last_turn.memory_facts)
 
         report = generate_report(
             logger=self.logger,
@@ -177,6 +180,7 @@ class PlaytestRunner:
             game_title=getattr(self, "_game_title", self.config.game_id),
             total_duration=total_duration,
             memory_final=memory_final,
+            memory_final_facts=memory_final_facts,
             call_log=self.call_log,
             quality_scores=self._quality_scores,
         )
@@ -267,9 +271,41 @@ class PlaytestRunner:
         if self.logger.is_repeating(result.narrator.narration, window=3):
             issues.append("narrator_repeating")
 
-        # Memory overflow -- key_facts exceeding limit (max 10 per CLAUDE.md)
+        # Memory at cap -- facts hitting MAX_KEY_FACTS limit
         for diff in result.memory_diffs:
-            if len(diff.new_facts) > 10:
-                issues.append(f"memory_overflow:{diff.character}")
+            if len(diff.new_facts) >= MAX_KEY_FACTS:
+                issues.append(f"memory_at_cap:{diff.character}")
+
+        # Fact-summary overlap -- facts that repeat what's in the summary
+        for diff in result.memory_diffs:
+            if not diff.new_summary or not diff.new_facts:
+                continue
+            summary_words = {
+                w.strip(".,;:!?\"'()")
+                for w in diff.new_summary.lower().split()
+                if len(w) > 3
+            }
+            for fact in diff.new_facts:
+                fact_words = [
+                    w.strip(".,;:!?\"'()") for w in fact.lower().split() if len(w) > 3
+                ]
+                if (
+                    fact_words
+                    and sum(1 for w in fact_words if w in summary_words)
+                    / len(fact_words)
+                    > 0.5
+                ):
+                    char_id = diff.character.lower().replace(" ", "_")
+                    issues.append(f"memory_fact_overlap:{char_id}")
+                    break  # one flag per character is enough
+
+        # Stale facts -- facts unchanged from previous turn
+        if self.logger.turns:
+            prev_turn = self.logger.turns[-1]
+            for diff in result.memory_diffs:
+                prev_facts = prev_turn.memory_facts.get(diff.character, [])
+                if prev_facts and prev_facts == diff.new_facts:
+                    char_id = diff.character.lower().replace(" ", "_")
+                    issues.append(f"memory_stale:{char_id}")
 
         return issues

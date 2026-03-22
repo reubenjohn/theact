@@ -33,6 +33,9 @@ class PlaytestReport:
     events: list[tuple[int, str, str]]  # (turn, event, detail)
     per_turn: list[dict]  # per-turn summary dicts
     memory_final: dict[str, str]  # character -> summary at end
+    memory_final_facts: dict[str, list[str]] = field(
+        default_factory=dict
+    )  # character -> final facts
     output_path: str = ""  # set after writing
 
     # Aggregate stats
@@ -45,10 +48,84 @@ class PlaytestReport:
     yaml_parse_success_rate: float = 0.0  # % of turns without parse failure
     quality_scores: list[dict] = field(default_factory=list)  # per-turn scores
 
+    # Memory health stats
+    memory_health: dict = field(default_factory=dict)
+
     # LLM call log stats (populated when call_log is provided)
     call_log_summary: dict = field(default_factory=dict)
     call_log_totals: dict = field(default_factory=dict)
     parse_failure_breakdown: dict = field(default_factory=dict)
+
+
+def _compute_memory_health(logger: PlaytestLogger) -> dict:
+    """Compute aggregate memory health statistics from turn logs."""
+    from theact.agents.prompts import MAX_KEY_FACTS
+
+    # Collect per-character, per-turn fact data
+    char_fact_history: dict[str, list[list[str]]] = {}
+    overlap_counts: dict[str, int] = 0  # type: ignore[assignment]
+    overlap_counts = {}
+    at_cap_counts: dict[str, int] = {}
+    stale_counts: dict[str, int] = {}
+    turns_with_memory = 0
+
+    for t in logger.turns:
+        if not t.memory_facts:
+            continue
+        turns_with_memory += 1
+        for char, facts in t.memory_facts.items():
+            char_fact_history.setdefault(char, []).append(facts)
+
+            # At cap?
+            if len(facts) >= MAX_KEY_FACTS:
+                at_cap_counts[char] = at_cap_counts.get(char, 0) + 1
+
+            # Overlap with summary?
+            summary = t.memory_updates.get(char, "")
+            if summary and facts:
+                summary_words = {
+                    w.strip(".,;:!?\"'()")
+                    for w in summary.lower().split()
+                    if len(w) > 3
+                }
+                for fact in facts:
+                    fact_words = [
+                        w.strip(".,;:!?\"'()")
+                        for w in fact.lower().split()
+                        if len(w) > 3
+                    ]
+                    if (
+                        fact_words
+                        and sum(1 for w in fact_words if w in summary_words)
+                        / len(fact_words)
+                        > 0.5
+                    ):
+                        overlap_counts[char] = overlap_counts.get(char, 0) + 1
+                        break
+
+    # Stale: facts identical to previous turn
+    for char, history in char_fact_history.items():
+        for i in range(1, len(history)):
+            if history[i] == history[i - 1]:
+                stale_counts[char] = stale_counts.get(char, 0) + 1
+
+    # Per-character summary
+    per_character: dict[str, dict] = {}
+    for char, history in char_fact_history.items():
+        fact_counts = [len(f) for f in history]
+        per_character[char] = {
+            "avg_fact_count": round(sum(fact_counts) / len(fact_counts), 1),
+            "max_fact_count": max(fact_counts),
+            "turns_at_cap": at_cap_counts.get(char, 0),
+            "turns_with_overlap": overlap_counts.get(char, 0),
+            "turns_stale": stale_counts.get(char, 0),
+            "total_turns": len(history),
+        }
+
+    return {
+        "per_character": per_character,
+        "turns_with_memory": turns_with_memory,
+    }
 
 
 def generate_report(
@@ -57,6 +134,7 @@ def generate_report(
     game_title: str,
     total_duration: float,
     memory_final: dict[str, str] | None = None,
+    memory_final_facts: dict[str, list[str]] | None = None,
     call_log: LLMCallLog | None = None,
     quality_scores: list[dict] | None = None,
 ) -> PlaytestReport:
@@ -122,6 +200,8 @@ def generate_report(
                 failures[r.parse_result] = failures.get(r.parse_result, 0) + 1
         parse_failure_breakdown = failures
 
+    memory_health = _compute_memory_health(logger)
+
     return PlaytestReport(
         game_id=config.game_id,
         game_title=game_title,
@@ -137,12 +217,14 @@ def generate_report(
         events=logger.events,
         per_turn=per_turn,
         memory_final=memory_final or {},
+        memory_final_facts=memory_final_facts or {},
         avg_turn_seconds=round(avg_turn, 2),
         slowest_turn_seconds=round(slowest, 2),
         fastest_turn_seconds=round(fastest, 2),
         character_response_rate=round(character_response_rate, 3),
         yaml_parse_success_rate=round(yaml_parse_success_rate, 3),
         quality_scores=quality_scores or [],
+        memory_health=memory_health,
         call_log_summary=call_log_summary,
         call_log_totals=call_log_totals,
         parse_failure_breakdown=parse_failure_breakdown,
@@ -293,13 +375,45 @@ def generate_report_markdown(report: PlaytestReport) -> str:
                 lines.append(f"- {failure_type}: {count}")
             lines.append("")
 
-    # Memory State
+    # Memory Health
+    if report.memory_health and report.memory_health.get("per_character"):
+        lines.append("## Memory Health")
+        lines.append("")
+        lines.append(
+            "| Character | Avg Facts | Max Facts | At Cap | Overlap | Stale | Turns |"
+        )
+        lines.append(
+            "|-----------|-----------|----------|--------|---------|-------|-------|"
+        )
+        for char, stats in report.memory_health["per_character"].items():
+            lines.append(
+                f"| {char} | {stats['avg_fact_count']} | {stats['max_fact_count']} "
+                f"| {stats['turns_at_cap']} | {stats['turns_with_overlap']} "
+                f"| {stats['turns_stale']} | {stats['total_turns']} |"
+            )
+        lines.append("")
+        lines.append(
+            "- **At Cap**: turns where fact count hit MAX_KEY_FACTS "
+            "(facts may be silently dropped)"
+        )
+        lines.append(
+            "- **Overlap**: turns where a fact repeated content already in the summary"
+        )
+        lines.append("- **Stale**: turns where facts were identical to previous turn")
+        lines.append("")
+
+    # Memory State (Final)
     if report.memory_final:
         lines.append("## Memory State (Final)")
         lines.append("")
         for char_name, summary in report.memory_final.items():
             lines.append(f"### {char_name}")
-            lines.append(f"Summary: {summary}")
+            lines.append(f"**Summary:** {summary}")
+            facts = report.memory_final_facts.get(char_name, [])
+            if facts:
+                lines.append("**Facts:**")
+                for f in facts:
+                    lines.append(f"- {f}")
             lines.append("")
 
     return "\n".join(lines)
@@ -340,11 +454,17 @@ def write_report(
             sort_keys=False,
         )
 
-    # Write memory_final.yaml
+    # Write memory_final.yaml (summary + facts per character)
     if report.memory_final:
+        memory_data = {}
+        for char, summary in report.memory_final.items():
+            memory_data[char] = {
+                "summary": summary,
+                "facts": report.memory_final_facts.get(char, []),
+            }
         with open(out_path / "memory_final.yaml", "w") as f:
             yaml.dump(
-                report.memory_final,
+                memory_data,
                 f,
                 default_flow_style=False,
                 allow_unicode=True,

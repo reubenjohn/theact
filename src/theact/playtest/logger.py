@@ -23,6 +23,7 @@ class TurnLog:
     character_thinking: dict[str, str] = field(default_factory=dict)
     characters_responded: list[str] = field(default_factory=list)
     memory_updates: dict[str, str] = field(default_factory=dict)
+    memory_facts: dict[str, list[str]] = field(default_factory=dict)
     memory_thinking: dict[str, str] = field(default_factory=dict)
     game_state_thinking: str = ""
     beats_hit: list[str] = field(default_factory=list)
@@ -62,8 +63,10 @@ class PlaytestLogger:
             chars_responded.append(cr.character)
 
         memory_updates: dict[str, str] = {}
+        memory_facts: dict[str, list[str]] = {}
         for diff in result.memory_diffs:
             memory_updates[diff.character] = diff.new_summary
+            memory_facts[diff.character] = list(diff.new_facts)
 
         beats_hit: list[str] = []
         if result.game_state:
@@ -77,6 +80,7 @@ class PlaytestLogger:
             character_thinking=char_thinking,
             characters_responded=chars_responded,
             memory_updates=memory_updates,
+            memory_facts=memory_facts,
             beats_hit=beats_hit,
             elapsed_seconds=elapsed,
         )
@@ -163,7 +167,7 @@ class PlaytestLogger:
         # Write conversation data
         conversation_data = []
         for t in self.turns:
-            turn_data = {
+            turn_data: dict = {
                 "turn": t.turn,
                 "player_input": t.player_input,
                 "narrator_text": t.narrator_text,
@@ -173,6 +177,14 @@ class PlaytestLogger:
                 "elapsed_seconds": round(t.elapsed_seconds, 2),
                 "issues": t.issues,
             }
+            if t.memory_updates or t.memory_facts:
+                turn_data["memory_updates"] = {
+                    char: {
+                        "summary": t.memory_updates.get(char, ""),
+                        "facts": t.memory_facts.get(char, []),
+                    }
+                    for char in set(t.memory_updates) | set(t.memory_facts)
+                }
             conversation_data.append(turn_data)
 
         with open(out_path / "conversation.yaml", "w") as f:

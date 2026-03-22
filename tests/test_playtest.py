@@ -570,7 +570,7 @@ class TestIssueDetection:
         issues = runner.logger.all_issues()
         assert any("narrator_repeating" in i for _, i in issues)
 
-    def test_detects_memory_overflow(self):
+    def test_detects_memory_at_cap(self):
         runner = PlaytestRunner(PlaytestConfig(game_id="test"))
         result = _make_turn_result(
             turn=1,
@@ -580,7 +580,7 @@ class TestIssueDetection:
                     character="Maya",
                     old_summary="",
                     new_summary="New summary",
-                    new_facts=[f"Fact {i}" for i in range(12)],
+                    new_facts=[f"Fact {i}" for i in range(7)],
                 )
             ],
         )
@@ -589,7 +589,7 @@ class TestIssueDetection:
         for issue in detected:
             runner.logger.log_issue(1, issue)
         issues = runner.logger.all_issues()
-        assert any("memory_overflow:Maya" in i for _, i in issues)
+        assert any("memory_at_cap:Maya" in i for _, i in issues)
 
     def test_no_false_positives_for_different_narration(self):
         runner = PlaytestRunner(PlaytestConfig(game_id="test"))
@@ -607,7 +607,7 @@ class TestIssueDetection:
         issues = runner.logger.all_issues()
         assert not any("narrator_repeating" in i for _, i in issues)
 
-    def test_no_memory_overflow_at_limit(self):
+    def test_no_memory_at_cap_under_limit(self):
         runner = PlaytestRunner(PlaytestConfig(game_id="test"))
         result = _make_turn_result(
             turn=1,
@@ -617,7 +617,7 @@ class TestIssueDetection:
                     character="Maya",
                     old_summary="",
                     new_summary="New summary",
-                    new_facts=[f"Fact {i}" for i in range(10)],
+                    new_facts=[f"Fact {i}" for i in range(5)],
                 )
             ],
         )
@@ -626,7 +626,7 @@ class TestIssueDetection:
         for issue in detected:
             runner.logger.log_issue(1, issue)
         issues = runner.logger.all_issues()
-        assert not any("memory_overflow" in i for _, i in issues)
+        assert not any("memory_at_cap" in i for _, i in issues)
 
 
 # -- Game File Verification ------------------------------------------------
