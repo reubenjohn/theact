@@ -184,12 +184,6 @@ def parse_generation_response(response_text: str) -> dict:
     return data
 
 
-# Backward-compatible aliases for internal callers
-_extract_yaml = extract_yaml
-_parse_proposal_response = parse_proposal_response
-_parse_generation_response = parse_generation_response
-
-
 async def generate_game_files(
     proposal: dict,
     client: AsyncOpenAI,
