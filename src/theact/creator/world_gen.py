@@ -5,7 +5,7 @@ from __future__ import annotations
 from openai import AsyncOpenAI
 
 from theact.creator.config import CreatorLLMConfig
-from theact.creator.generator import YAMLParseError, call_llm, extract_yaml
+from theact.creator.generator import call_llm_with_retry
 from theact.creator.prompts import WORLD_SYSTEM, WORLD_USER
 
 
@@ -34,28 +34,11 @@ async def generate_world(
         {"role": "user", "content": user_content},
     ]
 
-    MAX_ATTEMPTS = 2
-    last_error: YAMLParseError | None = None
-
-    for attempt in range(MAX_ATTEMPTS):
-        response_text = await call_llm(client, config, messages, call_type="world")
-        try:
-            data = extract_yaml(response_text)
-            # Validate required keys
-            required = {"setting", "tone", "rules"}
-            missing = required - set(data.keys())
-            if missing:
-                raise YAMLParseError(f"World YAML missing required keys: {missing}")
-            return data
-        except YAMLParseError as e:
-            last_error = e
-            if attempt < MAX_ATTEMPTS - 1:
-                messages.append({"role": "assistant", "content": response_text})
-                messages.append(
-                    {
-                        "role": "user",
-                        "content": f"That was not valid YAML: {e}\nPlease try again.",
-                    }
-                )
-
-    raise last_error  # type: ignore[misc]
+    return await call_llm_with_retry(
+        client,
+        config,
+        messages,
+        call_type="world",
+        required_keys={"setting", "tone", "rules"},
+        key_label="World YAML",
+    )

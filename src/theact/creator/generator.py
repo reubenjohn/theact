@@ -52,6 +52,48 @@ async def call_llm(
     return text
 
 
+async def call_llm_with_retry(
+    client: AsyncOpenAI,
+    config: CreatorLLMConfig,
+    messages: list[dict],
+    *,
+    call_type: str | None = None,
+    required_keys: set[str] | None = None,
+    key_label: str = "YAML",
+    max_attempts: int = 2,
+) -> dict:
+    """Call LLM, extract YAML, validate keys, retry on parse failure.
+
+    Common pattern used by world_gen, character_gen, and chapter_gen.
+    On failure, appends the error to messages and retries.
+    """
+    last_error: YAMLParseError | None = None
+
+    for attempt in range(max_attempts):
+        response_text = await call_llm(client, config, messages, call_type=call_type)
+        try:
+            data = extract_yaml(response_text)
+            if required_keys:
+                missing = required_keys - set(data.keys())
+                if missing:
+                    raise YAMLParseError(
+                        f"{key_label} missing required keys: {missing}"
+                    )
+            return data
+        except YAMLParseError as e:
+            last_error = e
+            if attempt < max_attempts - 1:
+                messages.append({"role": "assistant", "content": response_text})
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": f"That was not valid YAML: {e}\nPlease try again.",
+                    }
+                )
+
+    raise last_error  # type: ignore[misc]
+
+
 def serialize_game_data(data: dict) -> str:
     """Serialize a game data dict to a YAML string for prompt injection."""
     return yaml.dump(
