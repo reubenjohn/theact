@@ -38,4 +38,24 @@ dev = [
     "pytest>=9.0.2",
     "pytest-asyncio>=0.25.0",
     "pytest-playwright>=0.7.2",
+    "pytest-cov>=6.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["theact"]
+omit = [
+    "src/theact/cli/*",
+    "src/theact/web/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
+    "if TYPE_CHECKING:",
+]
+show_missing = true
+skip_covered = true

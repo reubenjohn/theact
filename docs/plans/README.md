@@ -23,6 +23,7 @@ TheAct is built in sequential phases. Each plan document is self-contained with 
 | 11 | [11-SmallModelHardening.md](11-SmallModelHardening.md) | Prompt iteration, YAML reliability, token budgets, golden scenarios | 09, 10 |
 | 12 | [12-CreatorSmallModelHardening.md](12-CreatorSmallModelHardening.md) | Brainstorm tool, decomposed proposal & generation, per-file fixing for small models | 06, 11 |
 | 13 | [13-WebUIExpansion/](13-WebUIExpansion/README.md) | **Implemented.** Web UI expansion: toolbar, sidebar, history, creator wizard, settings, playtest dashboard, diagnostics viewer, polish & safety | 07, 01–12 |
+| 14 | [14-CI.md](14-CI.md) | GitHub Actions CI: lint, test (matrix), browser tests, build, coverage | All |
 
 ## Cross-Cutting Implementation Notes
 

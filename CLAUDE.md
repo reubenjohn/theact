@@ -79,6 +79,7 @@ Detailed phase-by-phase plans are in `docs/plans/`. Read them in order:
 11. `11-SmallModelHardening.md` — Prompt iteration, YAML reliability, golden scenarios
 12. `12-CreatorSmallModelHardening.md` — Brainstorm tool, decomposed proposal & generation, per-file fixing
 13. `13-WebUIExpansion/` — Web UI expansion: toolbar, sidebar, history, creator wizard, settings, playtest dashboard, diagnostics viewer, polish & safety
+14. `14-CI.md` — GitHub Actions CI: lint, test (matrix), browser tests, build, coverage
 
 ## Commands
 
@@ -101,6 +102,15 @@ uv run python scripts/debug_turn.py --save test --input "I look around"  # Turn 
 uv run python scripts/run_golden.py                              # Golden scenario suite
 uv run python scripts/ab_test.py --variant-b prompts_v2.py --runs 3  # A/B test
 ```
+
+## CI
+
+GitHub Actions runs on push to main and PRs. See `.github/workflows/ci.yml`.
+- **Lint:** `ruff check .` + `ruff format --check .` (pinned to v0.11.4, matching `prek.toml`)
+- **Unit tests:** `pytest tests/ --ignore=tests/web/` with coverage (Python 3.11 + 3.12 matrix, includes `--extra web` for web unit tests)
+- **Browser tests:** `pytest tests/web/` with Playwright Chromium (`continue-on-error`)
+- **Build:** `uv build`
+- **Coverage:** Codecov (uploaded from Python 3.12 run only)
 
 ## Environment
 
