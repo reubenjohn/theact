@@ -340,9 +340,9 @@ async def run_turn(
         return_exceptions=True,
     )
 
-    # Unpack memory results (all except last)
-    memory_diffs: list[MemoryDiff] = []
-    for result in all_results[:-1]:
+    # Unpack memory results (all except last), keeping char_id paired with diff
+    successful_memory: list[tuple[str, MemoryDiff]] = []
+    for char_id, result in zip(memory_char_ids, all_results[:-1]):
         if isinstance(result, Exception):
             logger.warning(
                 "Memory update agent failed: %s: %s",
@@ -350,7 +350,7 @@ async def run_turn(
                 result,
             )
             continue
-        memory_diffs.append(result)
+        successful_memory.append((char_id, result))
 
     # Unpack game state result (last)
     state_result = all_results[-1]
@@ -394,10 +394,8 @@ async def run_turn(
     game.state.turn = new_turn
 
     # Apply memory diffs
-    for i, diff in enumerate(memory_diffs):
-        char_id = memory_char_ids[i] if i < len(memory_char_ids) else None
-        if char_id:
-            _apply_memory_diff(game, char_id, diff)
+    for char_id, diff in successful_memory:
+        _apply_memory_diff(game, char_id, diff)
 
     # Record newly hit beats (fuzzy-match against chapter definition)
     current_chapter = game.chapters.get(game.state.current_chapter)
@@ -452,7 +450,7 @@ async def run_turn(
         turn=new_turn,
         narrator=narrator_output,
         characters=character_responses,
-        memory_diffs=memory_diffs,
+        memory_diffs=[diff for _, diff in successful_memory],
         game_state=state_result,
         chapter_advanced=chapter_advanced,
         new_chapter=new_chapter,
