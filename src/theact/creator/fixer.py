@@ -116,11 +116,11 @@ async def fix_validation_errors(
         for file_key, file_errors in errors_by_file.items():
             file_type, stem = _parse_file_key(file_key)
             if file_type == "world":
-                file_data = current_data.get("world", {})
+                file_data = current_data.get("world") or {}
             elif file_type == "characters":
-                file_data = current_data.get("characters", {}).get(stem, {})
+                file_data = (current_data.get("characters") or {}).get(stem, {})
             elif file_type == "chapters":
-                file_data = current_data.get("chapters", {}).get(stem, {})
+                file_data = (current_data.get("chapters") or {}).get(stem, {})
             else:
                 # game.yaml errors are fixed by reassembly below
                 continue

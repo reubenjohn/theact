@@ -63,8 +63,7 @@ def _compute_memory_health(logger: PlaytestLogger) -> dict:
 
     # Collect per-character, per-turn fact data
     char_fact_history: dict[str, list[list[str]]] = {}
-    overlap_counts: dict[str, int] = 0  # type: ignore[assignment]
-    overlap_counts = {}
+    overlap_counts: dict[str, int] = {}
     at_cap_counts: dict[str, int] = {}
     stale_counts: dict[str, int] = {}
     turns_with_memory = 0
