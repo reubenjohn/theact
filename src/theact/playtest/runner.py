@@ -271,10 +271,10 @@ class PlaytestRunner:
         if self.logger.is_repeating(result.narrator.narration, window=3):
             issues.append("narrator_repeating")
 
-        # Memory at cap -- facts hitting MAX_KEY_FACTS limit
+        # Memory overflow -- facts exceeding MAX_KEY_FACTS (truncated by parser)
         for diff in result.memory_diffs:
-            if len(diff.new_facts) >= MAX_KEY_FACTS:
-                issues.append(f"memory_at_cap:{diff.character}")
+            if len(diff.new_facts) > MAX_KEY_FACTS:
+                issues.append(f"memory_overflow:{diff.character}")
 
         # Fact-summary overlap -- facts that repeat what's in the summary
         for diff in result.memory_diffs:

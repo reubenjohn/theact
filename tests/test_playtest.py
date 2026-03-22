@@ -570,7 +570,44 @@ class TestIssueDetection:
         issues = runner.logger.all_issues()
         assert any("narrator_repeating" in i for _, i in issues)
 
-    def test_detects_memory_at_cap(self):
+    def test_detects_memory_overflow(self):
+        runner = PlaytestRunner(PlaytestConfig(game_id="test"))
+        result = _make_turn_result(
+            turn=1,
+            narration="Some text.",
+            memory_diffs=[
+                MemoryDiff(
+                    character="Maya",
+                    old_summary="",
+                    new_summary="New summary",
+                    new_facts=[f"Fact {i}" for i in range(8)],
+                )
+            ],
+        )
+        detected = runner._detect_issues(1, result)
+        runner.logger.log_turn_result(1, result, 1.0)
+        for issue in detected:
+            runner.logger.log_issue(1, issue)
+        issues = runner.logger.all_issues()
+        assert any("memory_overflow:Maya" in i for _, i in issues)
+
+    def test_no_false_positives_for_different_narration(self):
+        runner = PlaytestRunner(PlaytestConfig(game_id="test"))
+        r1 = _make_turn_result(turn=1, narration="The jungle is dark and humid.")
+        runner.logger.log_turn_result(1, r1, 1.0)
+
+        r2 = _make_turn_result(
+            turn=2, narration="Bright sunlight bathes the camp in warmth."
+        )
+        # Detect before logging -- compares against turn 1 only
+        detected = runner._detect_issues(2, r2)
+        runner.logger.log_turn_result(2, r2, 1.0)
+        for issue in detected:
+            runner.logger.log_issue(2, issue)
+        issues = runner.logger.all_issues()
+        assert not any("narrator_repeating" in i for _, i in issues)
+
+    def test_no_memory_overflow_at_limit(self):
         runner = PlaytestRunner(PlaytestConfig(game_id="test"))
         result = _make_turn_result(
             turn=1,
@@ -589,44 +626,7 @@ class TestIssueDetection:
         for issue in detected:
             runner.logger.log_issue(1, issue)
         issues = runner.logger.all_issues()
-        assert any("memory_at_cap:Maya" in i for _, i in issues)
-
-    def test_no_false_positives_for_different_narration(self):
-        runner = PlaytestRunner(PlaytestConfig(game_id="test"))
-        r1 = _make_turn_result(turn=1, narration="The jungle is dark and humid.")
-        runner.logger.log_turn_result(1, r1, 1.0)
-
-        r2 = _make_turn_result(
-            turn=2, narration="Bright sunlight bathes the camp in warmth."
-        )
-        # Detect before logging -- compares against turn 1 only
-        detected = runner._detect_issues(2, r2)
-        runner.logger.log_turn_result(2, r2, 1.0)
-        for issue in detected:
-            runner.logger.log_issue(2, issue)
-        issues = runner.logger.all_issues()
-        assert not any("narrator_repeating" in i for _, i in issues)
-
-    def test_no_memory_at_cap_under_limit(self):
-        runner = PlaytestRunner(PlaytestConfig(game_id="test"))
-        result = _make_turn_result(
-            turn=1,
-            narration="Some text.",
-            memory_diffs=[
-                MemoryDiff(
-                    character="Maya",
-                    old_summary="",
-                    new_summary="New summary",
-                    new_facts=[f"Fact {i}" for i in range(3)],
-                )
-            ],
-        )
-        detected = runner._detect_issues(1, result)
-        runner.logger.log_turn_result(1, result, 1.0)
-        for issue in detected:
-            runner.logger.log_issue(1, issue)
-        issues = runner.logger.all_issues()
-        assert not any("memory_at_cap" in i for _, i in issues)
+        assert not any("memory_overflow" in i for _, i in issues)
 
 
 # -- Game File Verification ------------------------------------------------

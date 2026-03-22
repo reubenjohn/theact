@@ -65,7 +65,7 @@ def _compute_memory_health(logger: PlaytestLogger) -> dict:
     char_fact_history: dict[str, list[list[str]]] = {}
     overlap_counts: dict[str, int] = 0  # type: ignore[assignment]
     overlap_counts = {}
-    at_cap_counts: dict[str, int] = {}
+    overflow_counts: dict[str, int] = {}
     stale_counts: dict[str, int] = {}
     turns_with_memory = 0
 
@@ -77,8 +77,8 @@ def _compute_memory_health(logger: PlaytestLogger) -> dict:
             char_fact_history.setdefault(char, []).append(facts)
 
             # At cap?
-            if len(facts) >= MAX_KEY_FACTS:
-                at_cap_counts[char] = at_cap_counts.get(char, 0) + 1
+            if len(facts) > MAX_KEY_FACTS:
+                overflow_counts[char] = overflow_counts.get(char, 0) + 1
 
             # Overlap with summary?
             summary = t.memory_updates.get(char, "")
@@ -116,7 +116,7 @@ def _compute_memory_health(logger: PlaytestLogger) -> dict:
         per_character[char] = {
             "avg_fact_count": round(sum(fact_counts) / len(fact_counts), 1),
             "max_fact_count": max(fact_counts),
-            "turns_at_cap": at_cap_counts.get(char, 0),
+            "turns_overflow": overflow_counts.get(char, 0),
             "turns_with_overlap": overlap_counts.get(char, 0),
             "turns_stale": stale_counts.get(char, 0),
             "total_turns": len(history),
@@ -380,21 +380,21 @@ def generate_report_markdown(report: PlaytestReport) -> str:
         lines.append("## Memory Health")
         lines.append("")
         lines.append(
-            "| Character | Avg Facts | Max Facts | At Cap | Overlap | Stale | Turns |"
+            "| Character | Avg Facts | Max Facts | Overflow | Overlap | Stale | Turns |"
         )
         lines.append(
-            "|-----------|-----------|----------|--------|---------|-------|-------|"
+            "|-----------|-----------|----------|----------|---------|-------|-------|"
         )
         for char, stats in report.memory_health["per_character"].items():
             lines.append(
                 f"| {char} | {stats['avg_fact_count']} | {stats['max_fact_count']} "
-                f"| {stats['turns_at_cap']} | {stats['turns_with_overlap']} "
+                f"| {stats['turns_overflow']} | {stats['turns_with_overlap']} "
                 f"| {stats['turns_stale']} | {stats['total_turns']} |"
             )
         lines.append("")
         lines.append(
-            "- **At Cap**: turns where fact count hit MAX_KEY_FACTS "
-            "(facts may be silently dropped)"
+            "- **Overflow**: turns where model output exceeded MAX_KEY_FACTS "
+            "(facts were truncated)"
         )
         lines.append(
             "- **Overlap**: turns where a fact repeated content already in the summary"
