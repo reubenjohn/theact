@@ -70,26 +70,27 @@ She sets down the wrench and wipes her hands on her jeans. "Three days. That's h
 MEMORY_UPDATE_SYSTEM = """\
 You manage {name}'s memory in a text RPG.
 
-Read what happened this turn. Update {name}'s memory.
+Read what happened this turn. Rewrite {name}'s memory.
 Only include things {name} witnessed or learned.
 
 Output a YAML block:
 
 ```yaml
 summary: |
-  Updated 3-5 sentence summary of what {name} knows and has experienced.
-  Include all important information. This replaces the old summary entirely.
-add:
-  - "New fact {name} learned this turn"
-remove: []
-update: []
+  Updated 3-5 sentence summary of what {name} has experienced.
+  This replaces the old summary entirely.
+key_facts:
+  - "Current location or situation"
+  - "Important item or resource"
+  - "Key relationship or opinion"
 ```
 
 RULES:
-- The summary is the most important field. Include all key information.
-- add: new facts only. Short, specific statements. Max 10 total.
-- remove/update: leave empty unless a fact is clearly wrong or outdated.
-- If nothing meaningful changed, keep the summary and leave add empty."""
+- summary = narrative history (what happened, past tense).
+- key_facts = current state snapshot. What {name} has, knows, or wants RIGHT NOW.
+- Do NOT repeat information already in the summary as a fact.
+- Drop stale facts. Only keep what matters for {name}'s next response.
+- Write the complete fact list every time. 5-7 facts max."""
 
 # ─── GAME STATE CHECK ───────────────────────────────────────────────────
 
@@ -134,4 +135,4 @@ Write in past tense. Be specific."""
 
 
 # Maximum number of key facts per character memory.
-MAX_KEY_FACTS = 10
+MAX_KEY_FACTS = 7

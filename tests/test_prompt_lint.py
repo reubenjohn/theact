@@ -134,9 +134,7 @@ class TestYAMLHintExamples:
 
     def test_memory_yaml_example_has_required_fields(self):
         rendered = MEMORY_UPDATE_SYSTEM.format(name="Test")
-        assert "add:" in rendered
-        assert "remove:" in rendered
-        assert "update:" in rendered
+        assert "key_facts:" in rendered
         assert "summary:" in rendered
 
     def test_game_state_yaml_example_has_required_fields(self):

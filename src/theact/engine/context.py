@@ -314,7 +314,7 @@ def build_memory_messages(
             "content": (
                 f"Current memory for {character.name}:\n{current_memory}\n\n"
                 f"This turn:\n{turn_text}\n\n"
-                f"Output memory updates for {character.name}."
+                f"Rewrite {character.name}'s memory."
             ),
         },
     ]

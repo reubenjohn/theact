@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-from theact.agents.memory import _find_fact
 from theact.agents.narrator import _normalize_mood
 from theact.engine.turn import resolve_beat, resolve_character_id
 
@@ -129,36 +128,6 @@ class TestNormalizeMood:
     def test_unknown_defaults_to_calm(self):
         assert _normalize_mood("ecstatic") == "calm"
         assert _normalize_mood("confused") == "calm"
-
-
-# --- _find_fact ---
-
-
-class TestFindFact:
-    FACTS = [
-        "Maya met the player on the beach.",
-        "The plane crashed into the northern reef.",
-        "Joaquin carries a lantern.",
-    ]
-
-    def test_exact_match(self):
-        assert _find_fact("Joaquin carries a lantern.", self.FACTS) == 2
-
-    def test_case_insensitive(self):
-        assert _find_fact("joaquin carries a lantern.", self.FACTS) == 2
-
-    def test_fuzzy_paraphrase(self):
-        assert _find_fact("Maya met player on the beach", self.FACTS) == 0
-
-    def test_fuzzy_partial(self):
-        assert _find_fact("plane crashed into the reef", self.FACTS) == 1
-
-    def test_no_match(self):
-        assert _find_fact("The volcano erupted violently", self.FACTS) is None
-
-    def test_empty_inputs(self):
-        assert _find_fact("", self.FACTS) is None
-        assert _find_fact("something", []) is None
 
 
 # --- chapter_complete bool coercion ---

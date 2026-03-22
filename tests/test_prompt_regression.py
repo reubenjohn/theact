@@ -88,40 +88,35 @@ mood: mysterious
 
 
 class TestMemoryParsing:
-    def test_memory_with_add_and_summary(self):
+    def test_memory_with_facts_and_summary(self):
         content = """```yaml
 summary: |
   Maya knows about the crash and has met the player.
   She is wary but willing to cooperate.
-add:
+key_facts:
   - "Player seems trustworthy"
   - "Found fresh water source"
-remove: []
-update: []
 ```"""
         data = parse_yaml_response(content)
         assert "summary" in data
-        assert len(data["add"]) == 2
+        assert len(data["key_facts"]) == 2
 
-    def test_memory_empty_operations(self):
+    def test_memory_empty_facts(self):
         content = """```yaml
 summary: |
   Maya knows they crashed.
-add: []
-remove: []
-update: []
+key_facts: []
 ```"""
         data = parse_yaml_response(content)
-        assert data["add"] == []
+        assert data["key_facts"] == []
 
     def test_memory_no_fenced_block(self):
         """Model outputs YAML without fences."""
         content = """summary: |
   Maya remembers the crash.
-add:
+key_facts:
   - "Beach is dangerous at night"
-remove: []
-update: []"""
+"""
         data = parse_yaml_response(content)
         assert "summary" in data
 
@@ -130,8 +125,7 @@ update: []"""
         fixture = load_fixture("memory_update_001.yaml")
         data = parse_yaml_response(fixture["content"])
         assert "summary" in data
-        assert len(data["add"]) == 2
-        assert data["remove"] == []
+        assert len(data["key_facts"]) == 2
 
 
 class TestGameStateParsing:

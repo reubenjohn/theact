@@ -22,41 +22,6 @@ from theact.models.memory import CharacterMemory
 logger = logging.getLogger(__name__)
 
 
-def _find_fact(needle: str, facts: list[str]) -> int | None:
-    """Find the index of *needle* in *facts*, tolerating small-model paraphrasing.
-
-    Tries: exact → case-insensitive → best word-overlap (≥60%).
-    Returns the index or None.
-    """
-    if not needle or not facts:
-        return None
-    # 1. Exact
-    if needle in facts:
-        return facts.index(needle)
-    # 2. Case-insensitive
-    lower = needle.lower()
-    for i, f in enumerate(facts):
-        if f.lower() == lower:
-            return i
-    # 3. Word overlap
-    needle_words = {w for w in lower.split() if len(w) > 2}
-    if not needle_words:
-        return None
-    best_idx: int | None = None
-    best_score = 0.0
-    for i, f in enumerate(facts):
-        fact_words = {w for w in f.lower().split() if len(w) > 2}
-        if not fact_words:
-            continue
-        overlap = len(needle_words & fact_words)
-        shorter = min(len(needle_words), len(fact_words))
-        score = overlap / shorter
-        if score > best_score:
-            best_score = score
-            best_idx = i
-    return best_idx if best_score >= 0.6 else None
-
-
 async def run_memory_update(
     character: Character,
     memory: CharacterMemory | None,
@@ -81,12 +46,7 @@ async def run_memory_update(
             messages=messages,
             llm_config=llm_config,
             agent_config=MEMORY_UPDATE_CONFIG,
-            yaml_hint=(
-                "summary: |\\n  ...\\n"
-                "add:\\n  - ...\\n"
-                "remove:\\n  - ...\\n"
-                "update:\\n  - old: ...\\n    new: ..."
-            ),
+            yaml_hint=("summary: |\\n  ...\\nkey_facts:\\n  - ...\\n  - ..."),
         )
         data = result.data
     except YAMLParseError as e:
@@ -153,28 +113,9 @@ async def run_memory_update(
 
     new_summary = data.get("summary", old_summary) or old_summary
 
-    # Apply add/remove/update operations to build new facts list
-    new_facts = list(old_facts)
-
-    for fact in data.get("remove", []) or []:
-        idx = _find_fact(fact, new_facts)
-        if idx is not None:
-            new_facts.pop(idx)
-
-    for entry in data.get("update", []) or []:
-        if isinstance(entry, dict) and "old" in entry and "new" in entry:
-            idx = _find_fact(entry["old"], new_facts)
-            if idx is not None:
-                new_facts[idx] = entry["new"]
-            else:
-                # Old fact not found; treat as an add
-                new_facts.append(entry["new"])
-
-    for fact in data.get("add", []) or []:
-        new_facts.append(fact)
-
-    # Enforce max key facts limit
-    new_facts = new_facts[:MAX_KEY_FACTS]
+    # Full rewrite: model outputs complete curated fact list each turn
+    raw_facts = data.get("key_facts") or data.get("add") or []
+    new_facts = [str(f) for f in raw_facts if f][:MAX_KEY_FACTS]
 
     return MemoryDiff(
         character=character.name,
