@@ -1,0 +1,48 @@
+# Model Quirks: olafangensan-glm-4.7-flash-heretic
+# Observed behavior patterns and formatting preferences for the 7B thinking model.
+# Update this file as experiments reveal new patterns.
+
+model: olafangensan-glm-4.7-flash-heretic
+context_limit: 8192
+thinking_model: true
+thinking_tag: "<think>"
+
+known_behaviors:
+  - name: thinking_token_overhead
+    description: "Model uses <think> tags for reasoning before producing content"
+    impact: "500-2000 tokens consumed by thinking, reducing content budget"
+    mitigation: "Budget max_tokens to include thinking overhead (e.g., 2000 for narrator)"
+
+  - name: yaml_fence_unreliable
+    description: "Model sometimes omits closing ``` backticks on YAML blocks"
+    impact: "Parse failures if parser only looks for complete fences"
+    mitigation: "Fallback chain in extract_yaml_block: try unclosed fences, then raw YAML"
+
+  - name: empty_responding_characters
+    description: "Narrator frequently returns empty responding_characters list"
+    impact: "No character agents run, cascading to no memory updates"
+    mitigation: "Strengthened prompt: 'Include at least one character if any are nearby'"
+
+  - name: tab_indentation
+    description: "Model sometimes uses tabs instead of spaces in YAML"
+    impact: "YAML parse failure (tabs not allowed in YAML indentation)"
+    mitigation: "Tab normalization in parse_yaml_response before yaml.safe_load"
+
+  - name: trailing_prose
+    description: "Model adds conversational text after YAML block"
+    impact: "Text like 'I hope this helps!' appended after valid YAML"
+    mitigation: "extract_yaml_block takes content inside fences only"
+
+  - name: block_scalar_formatting
+    description: "Model sometimes omits newline after | in block scalars"
+    impact: "key: |value instead of key: |\n  value"
+    mitigation: "repair_yaml_text fixes this pattern"
+
+experiments: []
+# Experiments will be added as they are run. Format:
+#   - name: experiment_name
+#     variants: ["variant_a", "variant_b"]
+#     winner: "variant_a"
+#     notes: "Brief explanation of why"
+#     tested: "YYYY-MM-DD"
+#     runs_per_variant: 5
