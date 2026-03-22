@@ -1,9 +1,8 @@
 """Brainstorm chat side panel for the creator wizard.
 
 A free-form conversation panel that lets users chat with the LLM for
-inspiration before and during game creation. Reuses the brainstorm
-prompts from the creator module. The panel can optionally inject a
-summary of the conversation into the concept or feedback fields.
+inspiration before and during game creation. Uses BrainstormConversation
+from the creator module for message management, truncation, and summarization.
 """
 
 from __future__ import annotations
@@ -14,11 +13,9 @@ from openai import AsyncOpenAI
 
 from nicegui import ui
 
+from theact.creator.brainstorm import BrainstormConversation
 from theact.creator.config import CreatorLLMConfig
-from theact.creator.generator import call_llm
-from theact.creator.prompts import BRAINSTORM_SUMMARIZE_SYSTEM, BRAINSTORM_SYSTEM
 from theact.llm.inference import extract_think_tags
-from theact.llm.tokens import estimate_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +23,7 @@ logger = logging.getLogger(__name__)
 class CreatorChatPanel:
     """Collapsible side panel for brainstorming with the LLM."""
 
-    MAX_CONTEXT_TOKENS = 3000
-    KEEP_EXCHANGES = 6
+    KEEP_EXCHANGES = BrainstormConversation.KEEP_EXCHANGES
 
     def __init__(
         self,
@@ -35,12 +31,8 @@ class CreatorChatPanel:
         config: CreatorLLMConfig,
         on_use_text: callable | None = None,
     ) -> None:
-        self._client = client
-        self._config = config
+        self._conversation = BrainstormConversation(client, config)
         self._on_use_text = on_use_text
-        self._messages: list[dict] = [
-            {"role": "system", "content": BRAINSTORM_SYSTEM},
-        ]
         self._visible = False
         self._drawer: ui.right_drawer | None = None
         self._chat_container: ui.column | None = None
@@ -48,6 +40,15 @@ class CreatorChatPanel:
         self._sending = False
         # Track UI bubble containers so we can remove them on undo/clear.
         self._bubble_elements: list[ui.column] = []
+
+    # Backward-compatible access for tests that reach into _messages
+    @property
+    def _messages(self) -> list[dict]:
+        return self._conversation.messages
+
+    @_messages.setter
+    def _messages(self, value: list[dict]) -> None:
+        self._conversation.messages = value
 
     def build(self) -> None:
         """Build the right-drawer chat panel."""
@@ -131,10 +132,6 @@ class CreatorChatPanel:
         # Show user message
         self._render_message("You", text, user=True)
 
-        # Add to history and truncate
-        self._messages.append({"role": "user", "content": text})
-        self._truncate_if_needed()
-
         # Show thinking indicator
         with self._chat_container:
             thinking = ui.row().classes("items-center gap-2")
@@ -143,8 +140,7 @@ class CreatorChatPanel:
                 ui.label("Thinking...").style("color: #666; font-size: 0.85em;")
 
         try:
-            response = await call_llm(self._client, self._config, self._messages)
-            self._messages.append({"role": "assistant", "content": response})
+            response = await self._conversation.send(text)
             thinking.delete()
             reply_text, think_text = extract_think_tags(response)
             self._render_message(
@@ -200,25 +196,20 @@ class CreatorChatPanel:
 
     def _undo_last(self) -> None:
         """Remove the last user+assistant exchange from history and UI."""
-        if self._sending or len(self._messages) <= 1:
+        if self._sending or not self._conversation.has_conversation:
             return
-        # Remove last assistant reply (if present) then user message.
-        removed = 0
-        while len(self._messages) > 1 and removed < 2:
-            role = self._messages[-1]["role"]
-            self._messages.pop()
+        removed = self._conversation.undo_last()
+        # Keep bubble list in sync
+        for _ in range(removed):
             if self._bubble_elements:
                 self._bubble_elements.pop().delete()
-            removed += 1
-            if role == "user":
-                break
         ui.notify("Last message undone.", type="info")
 
     def _clear_chat(self) -> None:
         """Reset conversation to a blank slate."""
         if self._sending:
             return
-        self._messages = [self._messages[0]]  # keep system prompt
+        self._conversation.clear()
         self._bubble_elements.clear()
         if self._chat_container:
             self._chat_container.clear()
@@ -226,7 +217,7 @@ class CreatorChatPanel:
 
     async def _use_as_concept(self) -> None:
         """Summarize the conversation and pass it to the wizard."""
-        if len(self._messages) <= 1:
+        if not self._conversation.has_conversation:
             ui.notify("No conversation to summarize yet.", type="info")
             return
 
@@ -235,7 +226,7 @@ class CreatorChatPanel:
             return
 
         try:
-            summary = await self._summarize()
+            summary = await self._conversation.summarize()
             self._on_use_text(summary)
             ui.notify("Summary copied to concept field.", type="positive")
         except Exception as e:
@@ -244,28 +235,10 @@ class CreatorChatPanel:
 
     async def _summarize(self) -> str:
         """Compress conversation into a concept paragraph."""
-        lines = []
-        for msg in self._messages[1:]:
-            role = "Designer" if msg["role"] == "assistant" else "User"
-            lines.append(f"{role}: {msg['content']}")
-
-        summary_messages = [
-            {"role": "system", "content": BRAINSTORM_SUMMARIZE_SYSTEM},
-            {"role": "user", "content": "\n".join(lines)},
-        ]
-        return await call_llm(self._client, self._config, summary_messages)
+        return await self._conversation.summarize()
 
     def _truncate_if_needed(self) -> None:
         """Sliding window truncation when context exceeds budget."""
-        total = sum(estimate_tokens(m["content"]) for m in self._messages)
-        if total <= self.MAX_CONTEXT_TOKENS:
-            return
-        system = self._messages[:1]
-        rest = self._messages[1:]
-        keep_count = self.KEEP_EXCHANGES * 2
-        if len(rest) > keep_count:
-            drop_count = len(rest) - keep_count
-            rest = rest[-keep_count:]
-            # Keep bubble list in sync — drop the oldest UI elements.
+        drop_count = self._conversation.truncate_if_needed()
+        if drop_count > 0:
             self._bubble_elements = self._bubble_elements[drop_count:]
-        self._messages = system + rest

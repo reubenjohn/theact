@@ -3,7 +3,8 @@
 from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 import pytest
-from theact.creator.brainstorm import BrainstormSession, _estimate_tokens
+from theact.creator.brainstorm import BrainstormSession
+from theact.llm.tokens import estimate_tokens
 from theact.creator.config import CreatorLLMConfig
 
 
@@ -30,10 +31,10 @@ def _config() -> CreatorLLMConfig:
 
 class TestEstimateTokens:
     def test_empty_string(self):
-        assert _estimate_tokens("") == 0
+        assert estimate_tokens("") == 0
 
     def test_normal_string(self):
-        assert _estimate_tokens("Hello world!") == 3
+        assert estimate_tokens("Hello world!") == 3
 
 
 @pytest.mark.asyncio
