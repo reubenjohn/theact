@@ -140,9 +140,16 @@ Web UI browser tests require Chromium: `npx -y @playwright/test@latest install c
 - Pre-commit: ruff lint + format via `prek`
 - Tests: pytest with `tmp_path` fixtures for file operations
 
-## Web UI Change Workflow
+## Change Validation
 
-When modifying the web UI, always manually validate with Playwright MCP:
+Every change must be validated with the appropriate tools before considering it done:
+
+- **Unit-testable logic** — write/run `pytest` tests. Hardening fixes, parsing edge cases, and new logic must have test coverage.
+- **LLM-facing changes** — validate against a real LLM using the APIs configured in `.env`. Use the dev server, scripts (`diagnose_agent.py`, `playtest.py`), or Playwright MCP to exercise the full path.
+- **Web UI changes** — manually validate with Playwright MCP (see below).
+- **Learnings from bugs** — every bug fix or hardening improvement must be immortalized as a regression test so the issue cannot recur silently.
+
+### Web UI Validation with Playwright
 
 1. **Start the dev server:** `uv run scripts/dev_server.py restart --port 8111`
 2. **Navigate and inspect** using Playwright MCP tools (`browser_navigate`, `browser_snapshot`, `browser_take_screenshot`)

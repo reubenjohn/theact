@@ -9,6 +9,7 @@ summary of the conversation into the concept or feedback fields.
 from __future__ import annotations
 
 import logging
+import re
 
 from openai import AsyncOpenAI
 
@@ -22,6 +23,18 @@ logger = logging.getLogger(__name__)
 
 # Rough token estimate matching the rest of the codebase.
 _TOKEN_EST = 4  # chars per token
+
+_THINK_RE = re.compile(r"<think>(.*?)</think>", re.DOTALL)
+
+
+def _split_thinking(text: str) -> tuple[str | None, str]:
+    """Extract thinking block from response, return (thinking, reply)."""
+    match = _THINK_RE.search(text)
+    if not match:
+        return None, text
+    thinking = match.group(1).strip()
+    reply = _THINK_RE.sub("", text).strip()
+    return (thinking or None), reply
 
 
 class CreatorChatPanel:
@@ -147,7 +160,10 @@ class CreatorChatPanel:
             response = await call_llm(self._client, self._config, self._messages)
             self._messages.append({"role": "assistant", "content": response})
             thinking.delete()
-            self._render_message("Designer", response, user=False)
+            think_text, reply_text = _split_thinking(response)
+            self._render_message(
+                "Designer", reply_text, user=False, thinking=think_text
+            )
         except Exception as e:
             logger.exception("Chat message failed")
             thinking.delete()
@@ -156,7 +172,9 @@ class CreatorChatPanel:
         finally:
             self._sending = False
 
-    def _render_message(self, sender: str, text: str, *, user: bool) -> None:
+    def _render_message(
+        self, sender: str, text: str, *, user: bool, thinking: str | None = None
+    ) -> None:
         """Render a single chat message bubble."""
         with self._chat_container:
             align = "items-end" if user else "items-start"
@@ -169,6 +187,15 @@ class CreatorChatPanel:
                 ui.label(sender).style(
                     f"color: {color}; font-size: 0.75em; font-weight: bold;"
                 )
+                if thinking:
+                    with (
+                        ui.expansion("Thinking", icon="psychology")
+                        .classes("w-full")
+                        .style("color: #888; font-size: 0.8em; max-width: 95%;")
+                    ):
+                        ui.label(thinking).style(
+                            "color: #999; font-size: 0.85em; white-space: pre-wrap;"
+                        )
                 ui.label(text).style(
                     f"color: #ddd; font-size: 0.9em; background: {bg}; "
                     f"padding: 8px 12px; border-radius: 8px; max-width: 95%; "
