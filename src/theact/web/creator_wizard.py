@@ -238,6 +238,9 @@ class CreatorWizard:
                 .props("outlined rows=3")
             )
 
+            revise_progress = ui.column().classes("w-full")
+            revise_progress.set_visibility(False)
+
             async def on_revise():
                 feedback = feedback_input.value.strip()
                 if not feedback:
@@ -246,7 +249,7 @@ class CreatorWizard:
                         type="info",
                     )
                     return
-                await self._revise_proposal(feedback, review_container)
+                await self._revise_proposal(feedback, review_container, revise_progress)
                 feedback_input.value = ""
 
             async def on_accept():
@@ -319,15 +322,32 @@ class CreatorWizard:
                     )
 
     async def _revise_proposal(
-        self, feedback: str, review_container: ui.element
+        self,
+        feedback: str,
+        review_container: ui.element,
+        progress_container: ui.element,
     ) -> None:
         """Revise the proposal based on user feedback."""
-        ui.notify("Revising proposal...", type="info")
+        progress_container.clear()
+        progress_container.set_visibility(True)
+
+        def _progress(msg: str) -> ui.label:
+            with progress_container:
+                row = ui.row().classes("items-center gap-2")
+                with row:
+                    ui.spinner("dots", size="sm")
+                    label = ui.label(msg).style("color: #aaa;")
+            return label
 
         try:
+            label = _progress("Revising setting...")
             self._setting_data = await revise_setting(
                 self._setting_data, feedback, self._client, self._config
             )
+            label.style("color: #69f0ae;")
+            label.text = "Setting revised"
+
+            label = _progress("Revising characters...")
             self._characters_data = await revise_characters_proposal(
                 self._characters_data,
                 self._setting_data,
@@ -335,6 +355,10 @@ class CreatorWizard:
                 self._client,
                 self._config,
             )
+            label.style("color: #69f0ae;")
+            label.text = "Characters revised"
+
+            label = _progress("Revising chapters...")
             self._chapters_data = await revise_chapters_proposal(
                 self._chapters_data,
                 self._setting_data,
@@ -343,14 +367,20 @@ class CreatorWizard:
                 self._client,
                 self._config,
             )
+            label.style("color: #69f0ae;")
+            label.text = "Chapters revised"
+
             self._proposal = assemble_proposal(
                 self._setting_data, self._characters_data, self._chapters_data
             )
             self._render_proposal(review_container)
+            progress_container.clear()
+            progress_container.set_visibility(False)
             ui.notify("Proposal revised.", type="positive")
         except Exception as e:
             logger.exception("Proposal revision failed")
-            ui.notify(f"Revision failed: {e}", type="negative")
+            with progress_container:
+                ui.label(f"Revision failed: {e}").style("color: #ff5252;")
 
     # ------------------------------------------------------------------
     # Step 3: Generation
@@ -504,12 +534,15 @@ class CreatorWizard:
                 .props("outlined rows=3")
             )
 
+            revise_progress = ui.column().classes("w-full")
+            revise_progress.set_visibility(False)
+
             async def on_regenerate():
                 feedback = feedback_input.value.strip()
                 if not feedback:
                     ui.notify("Enter feedback to revise.", type="info")
                     return
-                await self._revise_generated(feedback)
+                await self._revise_generated(feedback, revise_progress)
                 self._render_generated_files(files_container)
                 feedback_input.value = ""
 
@@ -586,21 +619,44 @@ class CreatorWizard:
                         language="yaml",
                     ).classes("w-full")
 
-    async def _revise_generated(self, feedback: str) -> None:
+    async def _revise_generated(
+        self, feedback: str, progress_container: ui.element
+    ) -> None:
         """Revise generated files based on feedback."""
         from theact.creator.session import revise_targeted
 
-        ui.notify("Revising...", type="info")
+        progress_container.clear()
+        progress_container.set_visibility(True)
+
+        def _progress(msg: str) -> ui.label:
+            with progress_container:
+                row = ui.row().classes("items-center gap-2")
+                with row:
+                    ui.spinner("dots", size="sm")
+                    label = ui.label(msg).style("color: #aaa;")
+            return label
+
         try:
+            label = _progress("Revising game files...")
             self._generated_data = await revise_targeted(
                 self._generated_data, feedback, self._client, self._config
             )
+            label.style("color: #69f0ae;")
+            label.text = "Files revised"
+
+            label = _progress("Validating...")
             result = validate_game_data(self._generated_data)
             if not result.valid:
+                label.text = "Validation errors found, auto-fixing..."
                 self._generated_data, result = await fix_validation_errors(
                     self._generated_data, result, self._client, self._config
                 )
             self._validation_result = result
+            label.style("color: #69f0ae;")
+            label.text = "Validation complete"
+
+            progress_container.clear()
+            progress_container.set_visibility(False)
 
             if result.valid:
                 ui.notify("Revision complete.", type="positive")
@@ -611,7 +667,8 @@ class CreatorWizard:
                 )
         except Exception as e:
             logger.exception("Revision failed")
-            ui.notify(f"Revision failed: {e}", type="negative")
+            with progress_container:
+                ui.label(f"Revision failed: {e}").style("color: #ff5252;")
 
     async def _write_game(self, container: ui.element) -> None:
         """Write the game files to disk."""
