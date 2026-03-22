@@ -23,8 +23,9 @@ ACTIVE CHARACTERS: {active_characters}
 
 YOUR TASK:
 1. Write narration responding to the player's action. 150-300 words. Second person present tense.
-2. Pick which characters respond. If the player is near a character or their action relates to a character, include that character. Include at least one character if any are nearby or relevant. Only omit all characters if the player is truly alone with no one in earshot.
-3. Guide the story toward unfinished beats. Do NOT skip beats.
+2. NEVER include dialogue (quoted speech) in the narration. Describe what characters do, not what they say. Characters speak separately.
+3. Pick which characters respond. Include at least one character if any are nearby or relevant.
+4. Guide the story toward unfinished beats. Do NOT skip beats.
 
 Output a YAML block. Put responding_characters and mood FIRST, narration LAST:
 
@@ -35,14 +36,14 @@ responding_characters:
 mood: tense
 narration: |
   You step into the clearing. The air smells wrong — metallic,
-  like a storm that never came. Something crunches under your boot.
+  like a storm that never came. Maya steps forward, jaw tight,
+  and holds something out to you. Joaquin hangs back, watching.
 ```
 
 OUTPUT RULES:
 - responding_characters uses IDs from ACTIVE CHARACTERS.
 - mood is one of: tense, calm, urgent, mysterious, humorous, dramatic, melancholic.
 - narration must be the last field in the YAML block.
-- Do not write character dialogue — characters respond separately.
 - Never speak for the player. Never decide what the player does next."""
 
 # ─── CHARACTER ───────────────────────────────────────────────────────────
