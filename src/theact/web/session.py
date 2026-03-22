@@ -331,6 +331,9 @@ class GameplaySession:
             self._current_chapter_title(),
         )
 
+        # Player input first — the narrator responds to it
+        create_player_block(turn_card, self._state.game.state.player_name, player_input)
+
         renderer = StreamRenderer(
             turn_card=turn_card,
             show_thinking=self._state.show_thinking,
@@ -355,6 +358,13 @@ class GameplaySession:
 
             renderer.finish()
 
+            # Replace raw YAML with parsed narration + metadata badges
+            renderer.finalize_narrator(
+                narration=result.narrator.narration,
+                mood=result.narrator.mood,
+                responding_characters=result.narrator.responding_characters,
+            )
+
             # Show post-turn processing indicator
             with turn_card:
                 post_turn_row = ui.row().classes(
@@ -366,14 +376,10 @@ class GameplaySession:
                         "color: #888; font-size: 0.8em;"
                     )
 
-            create_player_block(
-                turn_card, self._state.game.state.player_name, player_input
-            )
-
-            # Show turn info bar (mood, beats, chapter advancement)
+            # Show turn info bar (beats, chapter advancement)
             create_turn_info_bar(
                 turn_card,
-                mood=result.narrator.mood,
+                mood=None,  # mood shown in narrator metadata badges
                 beats_hit=(result.game_state.beats_hit if result.game_state else []),
                 chapter_advanced=result.chapter_advanced,
                 new_chapter=result.new_chapter,

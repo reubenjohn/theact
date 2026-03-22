@@ -44,6 +44,11 @@ class StreamingTextBlock:
             full_text = "".join(self._buffer)
             self._element.content = self._text_to_html(full_text)
 
+    def replace_content(self, text: str) -> None:
+        """Replace the entire block content (e.g. after YAML parsing)."""
+        self._buffer = [text]
+        self._element.content = self._text_to_html(text)
+
     def _text_to_html(self, text: str) -> str:
         """Convert plain text to safe HTML for display."""
         escaped = html_lib.escape(text)
