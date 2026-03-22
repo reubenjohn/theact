@@ -123,8 +123,10 @@ class StreamRenderer:
 
         # Add metadata row (mood + responding characters) above narration
         if mood or responding_characters:
-            self._narrator_meta_row = ui.row().classes(
-                "items-center gap-2 narrator-meta"
+            self._narrator_meta_row = (
+                ui.row()
+                .classes("items-center gap-2 narrator-meta")
+                .style("margin-bottom: 4px;")
             )
             self._narrator_meta_row.move(self._narrator_container, target_index=1)
             with self._narrator_meta_row:
