@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import Awaitable, Callable
 
 from theact.agents.character import run_character
@@ -53,6 +54,86 @@ logger = logging.getLogger(__name__)
 # (source: "narrator"|"character", character_name: str | None, token: str,
 #  is_thinking: bool)
 StreamCallback = Callable[[str, str | None, str, bool], Awaitable[None]]
+
+# ---------------------------------------------------------------------------
+# Normalization helpers for small-model output
+# ---------------------------------------------------------------------------
+
+_STRIP_RE = re.compile(r"[^\w\s]")
+
+
+def _normalize_text(text: str) -> str:
+    """Lowercase, strip punctuation and extra whitespace."""
+    return _STRIP_RE.sub("", text.lower()).strip()
+
+
+def _word_set(text: str) -> set[str]:
+    """Return the set of meaningful words (len > 2) from normalized text."""
+    return {w for w in _normalize_text(text).split() if len(w) > 2}
+
+
+def resolve_beat(model_beat: str, canonical_beats: list[str]) -> str | None:
+    """Match a model-returned beat to a canonical beat from the chapter.
+
+    Returns the canonical beat text if a match is found, None otherwise.
+    Uses tight constraints: ≥60% word overlap with the best candidate.
+    """
+    stripped = model_beat.strip().strip("\"'")
+    # 1. Exact match
+    for cb in canonical_beats:
+        if stripped == cb:
+            return cb
+    # 2. Case-insensitive match
+    for cb in canonical_beats:
+        if stripped.lower() == cb.lower():
+            return cb
+    # 3. Fuzzy word-overlap match
+    model_words = _word_set(stripped)
+    if not model_words:
+        return None
+    best_score = 0.0
+    best_beat: str | None = None
+    for cb in canonical_beats:
+        canon_words = _word_set(cb)
+        if not canon_words:
+            continue
+        overlap = len(model_words & canon_words)
+        shorter = min(len(model_words), len(canon_words))
+        score = overlap / shorter if shorter else 0.0
+        if score > best_score:
+            best_score = score
+            best_beat = cb
+    if best_score >= 0.6 and best_beat is not None:
+        return best_beat
+    return None
+
+
+def resolve_character_id(model_id: str, characters: dict[str, object]) -> str | None:
+    """Resolve a model-returned character identifier to a canonical ID.
+
+    Tries: exact → case-insensitive → name match → partial match.
+    Returns the canonical character ID or None.
+    """
+    if not model_id or not model_id.strip():
+        return None
+    # 1. Exact match
+    if model_id in characters:
+        return model_id
+    # 2. Case-insensitive ID match
+    lower_map = {cid.lower(): cid for cid in characters}
+    if model_id.lower() in lower_map:
+        return lower_map[model_id.lower()]
+    # 3. Match against character display names
+    for cid, char in characters.items():
+        name = getattr(char, "name", "")
+        if name and name.lower() == model_id.lower():
+            return cid
+    # 4. Partial / slug match (e.g. "maya_chen" → "maya")
+    model_slug = model_id.lower().replace(" ", "_").replace("-", "_")
+    for cid in characters:
+        if model_slug.startswith(cid.lower()) or cid.lower().startswith(model_slug):
+            return cid
+    return None
 
 
 async def run_turn(
@@ -139,12 +220,15 @@ async def run_turn(
     character_responses: list[CharacterResponse] = []
     prior_responses: list[CharacterResponse] = []
 
-    for char_id in narrator_output.responding_characters:
-        if char_id not in game.characters:
+    for raw_char_id in narrator_output.responding_characters:
+        char_id = resolve_character_id(raw_char_id, game.characters)
+        if char_id is None:
             logger.warning(
-                "Narrator returned unknown character id: %s — skipping", char_id
+                "Narrator returned unknown character id: %s — skipping", raw_char_id
             )
             continue
+        if char_id != raw_char_id:
+            logger.info("Resolved character id %r → %r", raw_char_id, char_id)
 
         char = game.characters[char_id]
         char_memory = game.memories.get(char_id)
@@ -206,8 +290,9 @@ async def run_turn(
     memory_tasks = []
     memory_char_ids: list[str] = []
     diag_memory_msgs: dict[str, list[dict]] = {}
-    for char_id in narrator_output.responding_characters:
-        if char_id not in game.characters:
+    for raw_char_id in narrator_output.responding_characters:
+        char_id = resolve_character_id(raw_char_id, game.characters)
+        if char_id is None:
             continue
         char = game.characters[char_id]
         char_memory = game.memories.get(char_id)
@@ -300,10 +385,18 @@ async def run_turn(
         if char_id:
             _apply_memory_diff(game, char_id, diff)
 
-    # Record newly hit beats
+    # Record newly hit beats (fuzzy-match against chapter definition)
+    current_chapter = game.chapters.get(game.state.current_chapter)
+    canonical_beats = current_chapter.beats if current_chapter else []
     for beat in state_result.beats_hit:
-        if beat not in game.state.beats_hit:
-            game.state.beats_hit.append(beat)
+        resolved = resolve_beat(beat, canonical_beats)
+        if resolved is None:
+            logger.warning("Game state returned unrecognized beat: %r — ignoring", beat)
+            continue
+        if resolved != beat:
+            logger.info("Resolved beat %r → %r", beat, resolved)
+        if resolved not in game.state.beats_hit:
+            game.state.beats_hit.append(resolved)
 
     # Append all conversation entries
     for entry in entries:
