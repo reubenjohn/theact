@@ -21,6 +21,54 @@ logger = logging.getLogger(__name__)
 
 StreamCallback = Callable[[str, bool], Awaitable[None]]
 
+VALID_MOODS = frozenset(
+    {"tense", "calm", "urgent", "mysterious", "humorous", "dramatic", "melancholic"}
+)
+
+# Common synonyms / small-model paraphrases → canonical mood
+_MOOD_SYNONYMS: dict[str, str] = {
+    "sad": "melancholic",
+    "sorrowful": "melancholic",
+    "somber": "melancholic",
+    "grim": "melancholic",
+    "dark": "tense",
+    "scary": "tense",
+    "suspenseful": "tense",
+    "anxious": "tense",
+    "nervous": "tense",
+    "eerie": "mysterious",
+    "strange": "mysterious",
+    "curious": "mysterious",
+    "weird": "mysterious",
+    "funny": "humorous",
+    "comedic": "humorous",
+    "lighthearted": "humorous",
+    "peaceful": "calm",
+    "relaxed": "calm",
+    "serene": "calm",
+    "quiet": "calm",
+    "neutral": "calm",
+    "intense": "dramatic",
+    "epic": "dramatic",
+    "exciting": "dramatic",
+    "danger": "urgent",
+    "desperate": "urgent",
+    "critical": "urgent",
+    "panicked": "urgent",
+}
+
+
+def _normalize_mood(raw: str) -> str:
+    """Map a model-returned mood to a valid canonical mood."""
+    if raw in VALID_MOODS:
+        return raw
+    if raw in _MOOD_SYNONYMS:
+        mapped = _MOOD_SYNONYMS[raw]
+        logger.info("Normalized mood %r → %r", raw, mapped)
+        return mapped
+    logger.warning("Unrecognized mood %r, defaulting to 'calm'", raw)
+    return "calm"
+
 
 async def run_narrator(
     game: LoadedGame,
@@ -136,8 +184,11 @@ async def run_narrator(
             )
         )
 
+    raw_mood = (data.get("mood") or "calm").strip().lower()
+    mood = _normalize_mood(raw_mood)
+
     return NarratorOutput(
         narration=data.get("narration", "").strip(),
         responding_characters=data.get("responding_characters") or [],
-        mood=data.get("mood", "neutral") or "neutral",
+        mood=mood,
     )

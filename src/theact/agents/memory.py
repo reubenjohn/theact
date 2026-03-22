@@ -22,6 +22,41 @@ from theact.models.memory import CharacterMemory
 logger = logging.getLogger(__name__)
 
 
+def _find_fact(needle: str, facts: list[str]) -> int | None:
+    """Find the index of *needle* in *facts*, tolerating small-model paraphrasing.
+
+    Tries: exact → case-insensitive → best word-overlap (≥60%).
+    Returns the index or None.
+    """
+    if not needle or not facts:
+        return None
+    # 1. Exact
+    if needle in facts:
+        return facts.index(needle)
+    # 2. Case-insensitive
+    lower = needle.lower()
+    for i, f in enumerate(facts):
+        if f.lower() == lower:
+            return i
+    # 3. Word overlap
+    needle_words = {w for w in lower.split() if len(w) > 2}
+    if not needle_words:
+        return None
+    best_idx: int | None = None
+    best_score = 0.0
+    for i, f in enumerate(facts):
+        fact_words = {w for w in f.lower().split() if len(w) > 2}
+        if not fact_words:
+            continue
+        overlap = len(needle_words & fact_words)
+        shorter = min(len(needle_words), len(fact_words))
+        score = overlap / shorter
+        if score > best_score:
+            best_score = score
+            best_idx = i
+    return best_idx if best_score >= 0.6 else None
+
+
 async def run_memory_update(
     character: Character,
     memory: CharacterMemory | None,
@@ -122,15 +157,16 @@ async def run_memory_update(
     new_facts = list(old_facts)
 
     for fact in data.get("remove", []) or []:
-        if fact in new_facts:
-            new_facts.remove(fact)
+        idx = _find_fact(fact, new_facts)
+        if idx is not None:
+            new_facts.pop(idx)
 
     for entry in data.get("update", []) or []:
         if isinstance(entry, dict) and "old" in entry and "new" in entry:
-            try:
-                idx = new_facts.index(entry["old"])
+            idx = _find_fact(entry["old"], new_facts)
+            if idx is not None:
                 new_facts[idx] = entry["new"]
-            except ValueError:
+            else:
                 # Old fact not found; treat as an add
                 new_facts.append(entry["new"])
 

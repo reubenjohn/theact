@@ -102,8 +102,15 @@ async def run_game_state(
             )
         )
 
+    # Parse chapter_complete safely: YAML string "false" must not become True.
+    raw_complete = data.get("chapter_complete", False)
+    if isinstance(raw_complete, str):
+        completed = raw_complete.strip().lower() in ("true", "yes", "1")
+    else:
+        completed = bool(raw_complete)
+
     return GameStateResult(
         beats_hit=data.get("new_beats") or [],
-        completed=bool(data.get("chapter_complete", False)),
+        completed=completed,
         reasoning=data.get("reason"),
     )
