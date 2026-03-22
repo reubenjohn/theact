@@ -60,6 +60,11 @@ StreamCallback = Callable[[str, str | None, str, bool], Awaitable[None]]
 # Normalization helpers for small-model output
 # ---------------------------------------------------------------------------
 
+# Rolling summary triggers when unsummarized conversation exceeds this budget.
+SUMMARY_THRESHOLD_TOKENS = 1500
+# Number of recent turns to keep verbatim (not summarized).
+KEEP_RECENT_TURNS = 4
+
 _STRIP_RE = re.compile(r"[^\w\s]")
 
 
@@ -300,14 +305,12 @@ async def run_turn(
         )
 
     # -- Step 3: Post-turn agents (parallel) -----------------------------
+    # Reuse the already-resolved character IDs from step 2
 
     memory_tasks = []
     memory_char_ids: list[str] = []
     diag_memory_msgs: dict[str, list[dict]] = {}
-    for raw_char_id in narrator_output.responding_characters:
-        char_id = resolve_character_id(raw_char_id, game.characters)
-        if char_id is None:
-            continue
+    for char_id in seen_char_ids:
         char = game.characters[char_id]
         char_memory = game.memories.get(char_id)
         if diag:
@@ -532,9 +535,6 @@ async def _maybe_update_rolling_summary(
 
     Returns True if the summary was updated.
     """
-    SUMMARY_THRESHOLD = 1500  # tokens of unsummarized conversation
-    KEEP_RECENT = 4  # number of recent turns to keep verbatim
-
     # Only count entries added since the last summarization
     new_entries = [
         e for e in game.conversation if e.turn > game.state.last_summarized_turn
@@ -542,16 +542,16 @@ async def _maybe_update_rolling_summary(
     conv_text = "\n".join(e.content for e in new_entries)
     conv_tokens = estimate_tokens(conv_text)
 
-    if conv_tokens <= SUMMARY_THRESHOLD:
+    if conv_tokens <= SUMMARY_THRESHOLD_TOKENS:
         return False
 
-    # Find the cutoff: keep the last KEEP_RECENT turns
+    # Find the cutoff: keep the last KEEP_RECENT_TURNS turns
     turns_seen: set[int] = set()
     cutoff_idx = len(game.conversation)
     for i in range(len(game.conversation) - 1, -1, -1):
         t = game.conversation[i].turn
         turns_seen.add(t)
-        if len(turns_seen) > KEEP_RECENT:
+        if len(turns_seen) > KEEP_RECENT_TURNS:
             cutoff_idx = i + 1
             break
 
