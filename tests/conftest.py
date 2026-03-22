@@ -1,7 +1,9 @@
 """Shared fixtures for TheAct tests."""
 
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -133,3 +135,91 @@ def creator_config(**overrides) -> CreatorLLMConfig:
     defaults = {"api_key": "test-key", "model": "test-model"}
     defaults.update(overrides)
     return CreatorLLMConfig(**defaults)
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers for simulating OpenAI streaming responses
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FakeDelta:
+    content: Optional[str] = None
+    model_extra: Optional[dict] = None
+
+
+@dataclass
+class FakeChoice:
+    delta: FakeDelta
+    finish_reason: Optional[str] = None
+
+
+@dataclass
+class FakeChunk:
+    choices: list[FakeChoice]
+
+
+class AsyncChunkIterator:
+    """Async iterator over a list of fake chunks."""
+
+    def __init__(self, chunks):
+        self._chunks = chunks
+        self._index = 0
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self._index >= len(self._chunks):
+            raise StopAsyncIteration
+        chunk = self._chunks[self._index]
+        self._index += 1
+        return chunk
+
+
+def make_chunks(specs: list[dict]) -> list[FakeChunk]:
+    """Create fake streaming chunks from a list of specs.
+
+    Each spec can have:
+    - content: str -- delta content text
+    - reasoning_content: str -- thinking via model_extra
+    - finish_reason: str -- e.g. "stop"
+    """
+    chunks = []
+    for spec in specs:
+        model_extra = None
+        if "reasoning_content" in spec:
+            model_extra = {"reasoning_content": spec["reasoning_content"]}
+
+        delta = FakeDelta(
+            content=spec.get("content"),
+            model_extra=model_extra,
+        )
+        choice = FakeChoice(
+            delta=delta,
+            finish_reason=spec.get("finish_reason"),
+        )
+        chunks.append(FakeChunk(choices=[choice]))
+    return chunks
+
+
+def make_chunk(
+    content=None,
+    reasoning_content=None,
+    reasoning=None,
+    finish_reason=None,
+) -> FakeChunk:
+    """Build a single FakeChunk with the given fields.
+
+    Supports both ``reasoning_content`` (primary) and ``reasoning``
+    (fallback) keys in model_extra.
+    """
+    model_extra = None
+    if reasoning_content is not None:
+        model_extra = {"reasoning_content": reasoning_content}
+    elif reasoning is not None:
+        model_extra = {"reasoning": reasoning}
+
+    delta = FakeDelta(content=content, model_extra=model_extra)
+    choice = FakeChoice(delta=delta, finish_reason=finish_reason)
+    return FakeChunk(choices=[choice])

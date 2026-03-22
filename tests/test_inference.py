@@ -8,6 +8,10 @@ import httpx
 import openai
 import pytest
 
+from tests.conftest import (
+    AsyncChunkIterator,
+    make_chunks as make_stream_chunks,
+)
 from theact.llm.config import AgentLLMConfig, LLMConfig
 from theact.llm.errors import LLMConnectionError, LLMRateLimitError, LLMResponseError
 from theact.llm.inference import (
@@ -235,66 +239,6 @@ class TestCompleteStructured:
         assert len(calls) == 2
         last_message = calls[1][-1]  # last message in the retry
         assert "key: value" in last_message["content"]
-
-
-# --- Helpers for streaming tests ---
-
-
-@dataclass
-class FakeDelta:
-    content: Optional[str] = None
-    model_extra: Optional[dict] = None
-
-
-@dataclass
-class FakeStreamChoice:
-    delta: FakeDelta
-    finish_reason: Optional[str] = None
-
-
-@dataclass
-class FakeStreamChunk:
-    choices: list[FakeStreamChoice]
-
-
-class AsyncChunkIterator:
-    """Async iterator over a list of fake stream chunks."""
-
-    def __init__(self, chunks):
-        self._chunks = chunks
-        self._index = 0
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        if self._index >= len(self._chunks):
-            raise StopAsyncIteration
-        chunk = self._chunks[self._index]
-        self._index += 1
-        return chunk
-
-
-def make_stream_chunks(specs: list[dict]) -> list[FakeStreamChunk]:
-    """Create fake streaming chunks from specs.
-
-    Each spec can have: content, reasoning_content, finish_reason.
-    """
-    chunks = []
-    for spec in specs:
-        model_extra = None
-        if "reasoning_content" in spec:
-            model_extra = {"reasoning_content": spec["reasoning_content"]}
-        delta = FakeDelta(
-            content=spec.get("content"),
-            model_extra=model_extra,
-        )
-        choice = FakeStreamChoice(
-            delta=delta,
-            finish_reason=spec.get("finish_reason"),
-        )
-        chunks.append(FakeStreamChunk(choices=[choice]))
-    return chunks
 
 
 def _make_fake_request() -> httpx.Request:

@@ -1,10 +1,14 @@
 """Tests for streaming result types and stream processing."""
 
-from dataclasses import dataclass
-from typing import Optional
-
 import pytest
 
+from tests.conftest import (
+    AsyncChunkIterator,
+    FakeChoice,
+    FakeChunk,
+    FakeDelta,
+    make_chunks,
+)
 from theact.llm.streaming import (
     LLMResult,
     StreamChunk,
@@ -79,70 +83,6 @@ class TestStructuredResult:
         )
         assert result.data["key"] == "value"
         assert result.attempts == 1
-
-
-# --- Helpers for simulating OpenAI streaming responses ---
-
-
-@dataclass
-class FakeDelta:
-    content: Optional[str] = None
-    model_extra: Optional[dict] = None
-
-
-@dataclass
-class FakeChoice:
-    delta: FakeDelta
-    finish_reason: Optional[str] = None
-
-
-@dataclass
-class FakeChunk:
-    choices: list[FakeChoice]
-
-
-def make_chunks(specs: list[dict]) -> list[FakeChunk]:
-    """Create fake streaming chunks from a list of specs.
-
-    Each spec can have:
-    - content: str -- delta content text
-    - reasoning_content: str -- thinking via model_extra
-    - finish_reason: str -- e.g. "stop"
-    """
-    chunks = []
-    for spec in specs:
-        model_extra = None
-        if "reasoning_content" in spec:
-            model_extra = {"reasoning_content": spec["reasoning_content"]}
-
-        delta = FakeDelta(
-            content=spec.get("content"),
-            model_extra=model_extra,
-        )
-        choice = FakeChoice(
-            delta=delta,
-            finish_reason=spec.get("finish_reason"),
-        )
-        chunks.append(FakeChunk(choices=[choice]))
-    return chunks
-
-
-class AsyncChunkIterator:
-    """Async iterator over a list of fake chunks."""
-
-    def __init__(self, chunks):
-        self._chunks = chunks
-        self._index = 0
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        if self._index >= len(self._chunks):
-            raise StopAsyncIteration
-        chunk = self._chunks[self._index]
-        self._index += 1
-        return chunk
 
 
 class TestProcessStream:

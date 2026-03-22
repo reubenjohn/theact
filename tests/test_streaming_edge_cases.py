@@ -10,62 +10,14 @@ from typing import Optional
 
 import pytest
 
+from tests.conftest import (
+    AsyncChunkIterator,
+    FakeChoice,
+    FakeChunk,
+    FakeDelta,
+    make_chunk as _make_chunk,
+)
 from theact.llm.streaming import collect_stream, process_stream
-
-
-# --- Helpers (same pattern as test_streaming.py) ---
-
-
-@dataclass
-class FakeDelta:
-    content: Optional[str] = None
-    model_extra: Optional[dict] = None
-
-
-@dataclass
-class FakeChoice:
-    delta: FakeDelta
-    finish_reason: Optional[str] = None
-
-
-@dataclass
-class FakeChunk:
-    choices: list[FakeChoice]
-
-
-class AsyncChunkIterator:
-    def __init__(self, chunks):
-        self._chunks = chunks
-        self._index = 0
-
-    def __aiter__(self):
-        return self
-
-    async def __anext__(self):
-        if self._index >= len(self._chunks):
-            raise StopAsyncIteration
-        chunk = self._chunks[self._index]
-        self._index += 1
-        return chunk
-
-
-def _make_chunk(
-    content=None,
-    reasoning_content=None,
-    reasoning=None,
-    finish_reason=None,
-):
-    """Build a single FakeChunk with the given fields."""
-    model_extra = None
-    if reasoning_content is not None:
-        model_extra = {"reasoning_content": reasoning_content}
-    elif reasoning is not None:
-        # Use the "reasoning" key (fallback path, line 103)
-        model_extra = {"reasoning": reasoning}
-
-    delta = FakeDelta(content=content, model_extra=model_extra)
-    choice = FakeChoice(delta=delta, finish_reason=finish_reason)
-    return FakeChunk(choices=[choice])
 
 
 async def _collect(chunks):
