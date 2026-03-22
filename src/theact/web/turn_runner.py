@@ -6,7 +6,7 @@ handle UI updates -- returns the TurnResult for the caller to render.
 
 from __future__ import annotations
 
-from theact.engine.turn import StreamCallback, run_turn
+from theact.engine.turn import NarratorDoneCallback, StreamCallback, run_turn
 from theact.engine.types import TurnResult
 from theact.llm.call_log import LLMCallLog
 from theact.web.state import GameSessionState
@@ -23,6 +23,7 @@ class TurnRunner:
         self,
         player_input: str,
         on_token: StreamCallback | None = None,
+        on_narrator_done: NarratorDoneCallback | None = None,
     ) -> TurnResult:
         """Run a turn and return the result.
 
@@ -35,6 +36,7 @@ class TurnRunner:
             player_input=player_input,
             llm_config=self._state.llm_config,
             on_token=on_token,
+            on_narrator_done=on_narrator_done,
             call_log=self.call_log,
             debug=self._state.debug_mode,
         )

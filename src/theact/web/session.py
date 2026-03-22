@@ -351,19 +351,20 @@ class GameplaySession:
                     ui.label("processing...").style("color: #888; font-size: 0.8em;")
                 spinner_row.set_visibility(False)
 
+            async def _on_narrator_done(narrator_output) -> None:
+                renderer.finalize_narrator(
+                    narration=narrator_output.narration,
+                    mood=narrator_output.mood,
+                    responding_characters=narrator_output.responding_characters,
+                )
+
             result = await self._turn_runner.run(
                 player_input=player_input,
                 on_token=renderer.route_token,
+                on_narrator_done=_on_narrator_done,
             )
 
             renderer.finish()
-
-            # Replace raw YAML with parsed narration + metadata badges
-            renderer.finalize_narrator(
-                narration=result.narrator.narration,
-                mood=result.narrator.mood,
-                responding_characters=result.narrator.responding_characters,
-            )
 
             # Show post-turn processing indicator
             with turn_card:

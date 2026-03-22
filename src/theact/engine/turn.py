@@ -31,6 +31,7 @@ from theact.engine.types import (
     CharacterResponse,
     GameStateResult,
     MemoryDiff,
+    NarratorOutput,
     TurnResult,
 )
 from theact.io.save_manager import (
@@ -136,11 +137,15 @@ def resolve_character_id(model_id: str, characters: dict[str, object]) -> str | 
     return None
 
 
+NarratorDoneCallback = Callable[[NarratorOutput], Awaitable[None]]
+
+
 async def run_turn(
     game: LoadedGame,
     player_input: str,
     llm_config: LLMConfig,
     on_token: StreamCallback | None = None,
+    on_narrator_done: NarratorDoneCallback | None = None,
     call_log: LLMCallLog | None = None,
     debug: bool = False,
 ) -> TurnResult:
@@ -152,6 +157,8 @@ async def run_turn(
         llm_config: LLM configuration.
         on_token: Optional callback for streaming tokens to the UI.
             Called as: await on_token(source, character_name, token_text)
+        on_narrator_done: Optional callback fired after narrator parsing,
+            before character agents start. Receives the parsed NarratorOutput.
 
     Returns:
         TurnResult with all turn data.
@@ -214,6 +221,9 @@ async def run_turn(
     entries.append(
         ConversationEntry(turn=new_turn, role="player", content=player_input)
     )
+
+    if on_narrator_done:
+        await on_narrator_done(narrator_output)
 
     # -- Step 2: Character agents (sequential) ---------------------------
 
