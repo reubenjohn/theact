@@ -25,7 +25,7 @@ class CreatorLLMConfig:
     model: str = ""
     temperature: float = 0.7  # moderate creativity for game design
     max_tokens: int = 4096  # large model default
-    proposal_max_tokens: int = 1500  # proposals are shorter
+    proposal_max_tokens: int = 3000  # generous to accommodate thinking models
 
     # Small model overrides (applied when is_small_model is True)
     small_model_world_max_tokens: int = 800

@@ -49,7 +49,7 @@ async def fix_file(
         },
     ]
 
-    response = await call_llm(client, config, messages)
+    response = await call_llm(client, config, messages, call_type="fix")
     try:
         return extract_yaml(response)
     except YAMLParseError:

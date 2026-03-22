@@ -15,7 +15,7 @@ class TestCreatorLLMConfig:
         assert config.model == ""
         assert config.temperature == 0.7
         assert config.max_tokens == 4096
-        assert config.proposal_max_tokens == 1500
+        assert config.proposal_max_tokens == 3000
 
     def test_frozen(self):
         config = CreatorLLMConfig()
@@ -52,12 +52,12 @@ class TestCreatorLLMConfig:
         assert config.max_tokens_for("character") == 800
         assert config.max_tokens_for("chapter") == 1000
         assert config.max_tokens_for("fix") == 600
-        assert config.max_tokens_for("proposal") == 1500
+        assert config.max_tokens_for("proposal") == 3000
 
     def test_max_tokens_for_large_model(self):
         config = CreatorLLMConfig(model="gpt-4o")
         assert config.max_tokens_for("world") == 4096
-        assert config.max_tokens_for("proposal") == 1500
+        assert config.max_tokens_for("proposal") == 3000
 
     def test_generation_temperature_small_model(self):
         config = CreatorLLMConfig(model=_GAMEPLAY_MODEL)

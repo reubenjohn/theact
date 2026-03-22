@@ -38,7 +38,7 @@ async def generate_world(
     last_error: YAMLParseError | None = None
 
     for attempt in range(MAX_ATTEMPTS):
-        response_text = await call_llm(client, config, messages)
+        response_text = await call_llm(client, config, messages, call_type="world")
         try:
             data = extract_yaml(response_text)
             # Validate required keys

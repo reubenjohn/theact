@@ -16,14 +16,23 @@ class YAMLParseError(Exception):
 
 
 async def call_llm(
-    client: AsyncOpenAI, config: CreatorLLMConfig, messages: list[dict]
+    client: AsyncOpenAI,
+    config: CreatorLLMConfig,
+    messages: list[dict],
+    call_type: str | None = None,
 ) -> str:
-    """Call the LLM and return the response text content."""
+    """Call the LLM and return the response text content.
+
+    Args:
+        call_type: Optional call type ("world", "character", "chapter", "fix")
+            to select per-type max_tokens via config.max_tokens_for().
+            When None, uses config.max_tokens.
+    """
     response = await client.chat.completions.create(
         model=config.model,
         messages=messages,
-        temperature=config.temperature,
-        max_tokens=config.max_tokens,
+        temperature=config.generation_temperature,
+        max_tokens=config.max_tokens_for(call_type) if call_type else config.max_tokens,
     )
     return response.choices[0].message.content or ""
 

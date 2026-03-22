@@ -64,7 +64,7 @@ async def generate_character(
     last_error: YAMLParseError | None = None
 
     for attempt in range(MAX_ATTEMPTS):
-        response_text = await call_llm(client, config, messages)
+        response_text = await call_llm(client, config, messages, call_type="character")
         try:
             data = extract_yaml(response_text)
             required = {"name", "role", "personality", "secret"}

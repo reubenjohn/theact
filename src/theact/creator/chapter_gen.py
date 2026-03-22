@@ -68,7 +68,7 @@ async def generate_chapter(
     last_error: YAMLParseError | None = None
 
     for attempt in range(MAX_ATTEMPTS):
-        response_text = await call_llm(client, config, messages)
+        response_text = await call_llm(client, config, messages, call_type="chapter")
         try:
             data = extract_yaml(response_text)
             required = {"id", "title", "summary", "beats", "completion"}
