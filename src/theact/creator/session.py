@@ -49,6 +49,13 @@ from theact.creator.writer import write_game_files
 
 console = Console()
 
+_APPROVAL_KEYWORDS = frozenset(("ok", "looks good", "good", "yes", "y"))
+
+
+def _is_approval(text: str) -> bool:
+    """Check if user input indicates approval of the current state."""
+    return text.strip().lower() in _APPROVAL_KEYWORDS
+
 
 async def create_game(concept: str | None = None) -> Path | None:
     """Run the interactive game creation flow.
@@ -121,7 +128,7 @@ async def create_game(concept: str | None = None) -> Path | None:
         feedback = _get_input(prompt='Type feedback to revise, or "ok" to finalize: ')
         if not feedback:
             return None
-        if feedback.strip().lower() in ("ok", "looks good", "good", "yes", "y"):
+        if _is_approval(feedback):
             break
         console.print("\n[dim]Revising...[/dim]\n")
         data = await revise_targeted(data, feedback, client, config)
@@ -177,7 +184,7 @@ async def _decomposed_proposal(
         feedback = _get_input(prompt='Feedback on setting, or "ok" to continue: ')
         if not feedback:
             return None
-        if feedback.strip().lower() in ("ok", "looks good", "good", "yes", "y"):
+        if _is_approval(feedback):
             break
         console.print("\n[dim]Revising setting...[/dim]\n")
         setting_data = await revise_setting(setting_data, feedback, client, config)
@@ -194,7 +201,7 @@ async def _decomposed_proposal(
         feedback = _get_input(prompt='Feedback on characters, or "ok" to continue: ')
         if not feedback:
             return None
-        if feedback.strip().lower() in ("ok", "looks good", "good", "yes", "y"):
+        if _is_approval(feedback):
             break
         console.print("\n[dim]Revising characters...[/dim]\n")
         characters_data = await revise_characters_proposal(
@@ -213,7 +220,7 @@ async def _decomposed_proposal(
         feedback = _get_input(prompt='Feedback on chapters, or "ok" to continue: ')
         if not feedback:
             return None
-        if feedback.strip().lower() in ("ok", "looks good", "good", "yes", "y"):
+        if _is_approval(feedback):
             break
         console.print("\n[dim]Revising chapters...[/dim]\n")
         chapters_data = await revise_chapters_proposal(
